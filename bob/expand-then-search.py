@@ -1,5 +1,6 @@
 import ai
 import time
+import copy
 AIClass="ExpandThenSearch"
 
 #just a merge of expanding-blob then searcher if more than N units
@@ -99,29 +100,28 @@ class ExpandThenSearch(ai.AI):
       self.location_units[min_pos] = unit
 
     def expanding_unit_died(self, unit):
-      try:
-        del self.location_units[self.unit_locations[unit]]
-        del self.unit_locations[unit]
-        for building in self.guarded:
-          if unit.position == building.position:
-            print 'we lost a guard!!'
-            self.guarded.remove(building)
-            min_dist = float('inf')
-            min_unit = None
-            for xunit in self.my_units:
-              dist = distance(xunit.position,building.position) #TODO make sure this one isn't guarding something else
-              if xunit != unit and xunit.is_alive and dist < min_dist:
-                min_unit = xunit
-                min_dist = dist
-            if min_unit is not None:
-              self.guarded.add(building)
-              location = self.unit_locations[min_unit]
-              del self.location_units[location]
-              self.unit_locations[min_unit] = building.position
-              print 'moving',min_unit,'to become a guard of',building.position
-      except:
-        import traceback
-        traceback.print_exc()
+      del self.location_units[self.unit_locations[unit]]
+      del self.unit_locations[unit]
+      guarded_copy = copy.copy(self.guarded)
+      for building in guarded_copy:
+        if unit.position == building.position:
+          print 'we lost a guard!!'
+          self.guarded.remove(building)
+          min_dist = float('inf')
+          min_unit = None
+          for xunit in self.my_units:
+            dist = distance(xunit.position,building.position) #TODO make sure this one isn't guarding something else
+            if xunit != unit and xunit.is_alive and dist < min_dist:
+              min_unit = xunit
+              min_dist = dist
+          if min_unit is not None:
+            self.guarded.add(building)
+            location = self.unit_locations[min_unit]
+            del self.location_units[location]
+            self.unit_locations[min_unit] = building.position
+            self.location_units[building.position] = min_unit
+            print 'moving',min_unit,'to become a guard of',building.position
+
     def searcher_init(self):
       self.guards           = set()
       self.known_buildings  = set()

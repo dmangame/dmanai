@@ -1,4 +1,5 @@
 import ai
+import copy
 AIClass="ExpandingBlob"
 def distance(a,b):
   return (a[0]-b[0])**2+(a[1]-b[1])**2
@@ -34,26 +35,43 @@ class ExpandingBlob(ai.AI):
       for building in self.visible_buildings:
         if building not in self.guarded:
           self.guarded.add(building)
-          rpos = building.position
-          position = (int(rpos[0]/self.area_size)*self.area_size,int(rpos[1]/self.area_size)*self.area_size)
-          self.unit_locations[unit] = position
-          self.location_units[position] = unit
+          print unit,'is holding',building
+          #rpos = building.position
+          #position = (int(rpos[0]/self.area_size)*self.area_size,int(rpos[1]/self.area_size)*self.area_size)
+          self.unit_locations[unit] = building.position
+          self.location_units[building.position] = unit
           return
       locations = set(self.locations).difference(set(self.location_units.keys()))
       min_pos  = unit.position
       min_dist = float('inf')
-      for location in locations:
-        dist = distance(unit.position,location)
-        if dist < min_dist:
-          min_dist = dist
-          min_pos  = location
+      for building in self.visible_buildings:
+        for location in locations:
+          dist = distance(building.position,location)
+          if dist < min_dist:
+            min_dist = dist
+            min_pos  = location
       self.unit_locations[unit] = min_pos
       self.location_units[min_pos] = unit
 
     def _unit_died(self, unit):
       del self.location_units[self.unit_locations[unit]]
       del self.unit_locations[unit]
-      for building in self.guarded:
+      guarded_copy = copy.copy(self.guarded)
+      for building in guarded_copy:
         if unit.position == building.position:
+          print 'we lost a guard!!'
           self.guarded.remove(building)
-          #TODO reposition the units to take this back
+          min_dist = float('inf')
+          min_unit = None
+          for xunit in self.my_units:
+            dist = distance(xunit.position,building.position) #TODO make sure this one isn't guarding something else
+            if xunit != unit and xunit.is_alive and dist < min_dist:
+              min_unit = xunit
+              min_dist = dist
+          if min_unit is not None:
+            self.guarded.add(building)
+            location = self.unit_locations[min_unit]
+            del self.location_units[location]
+            self.unit_locations[min_unit] = building.position
+            self.location_units[building.position] = min_unit
+            print 'moving',min_unit,'to become a guard of',building.position
