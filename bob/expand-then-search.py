@@ -6,11 +6,13 @@ AIClass="ExpandThenSearch"
 #just a merge of expanding-blob then searcher if more than N units
 
 class LocationHistory:
-    area_size = 8
+    area_size = 15
     def __init__(self, size):
       areas = [(x*self.area_size,y*self.area_size) for x in xrange((size+10)/self.area_size) for y in xrange((size+10)/self.area_size)]
       self.visit_time_positions = {0: areas}
       self.position_visit_times = dict((area,0) for area in areas)
+      self.duplicates = {}
+      self.duplicated = {}
 
     def get_least_recently_visited_area(self, my_location, exclude):
       visit_times = sorted(self.visit_time_positions.keys())
@@ -18,7 +20,13 @@ class LocationHistory:
       min_location = my_location #stay put if everything is already excluded, we probably won
       for visit_time in visit_times:
         for area in self.visit_time_positions[visit_time]:
-          if area in exclude:
+          if area in exclude and area in self.duplicates:
+            self.duplicates[area] -= 1
+            self.duplicated.setdefault(area,0)
+            self.duplicated[area] += 1
+            if self.duplicates[area] == 1:
+              del self.duplicates[area]
+          elif area in exclude:
             continue
           distance = (my_location[0]-area[0])**2+(my_location[1]-area[1])**2
           if distance < min_distance:
@@ -28,14 +36,20 @@ class LocationHistory:
           break
       return min_location
 
-    def visited(self, positions, now=None):
+    def visited(self, positions, now=None, duplicate=1):
       if now is None:
         now = int(time.time()*10000)
-      while now in self.visit_time_positions:
-        now += 1
-      self.visit_time_positions[now] = []
+      if now not in self.visit_time_positions:
+        self.visit_time_positions[now] = []
       for rpos in positions:
         position = (int(rpos[0]/self.area_size)*self.area_size,int(rpos[1]/self.area_size)*self.area_size)
+        if position in self.duplicated:
+          self.duplicated[position] -= 1
+          if self.duplicated[position] == 0:
+            del self.duplicated[position]
+          continue
+        if duplicate > 1:
+          self.duplicates[position] = duplicate
         self.visit_time_positions[now].append(position)
         previous = self.position_visit_times[position]
         self.position_visit_times[position] = now
@@ -49,7 +63,7 @@ def distance(a,b):
 
 class ExpandThenSearch(ai.AI):
 
-    area_size = 20
+    area_size = 15
     def expanding_init(self):
       self.locations      = [(x*self.area_size,y*self.area_size) for x in xrange((self.mapsize+20)/self.area_size) for y in xrange((self.mapsize+20)/self.area_size)]
       self.location_units = {}
@@ -164,9 +178,9 @@ class ExpandThenSearch(ai.AI):
     def determine_potential_bases(self):
       bases = set()
       for location in self.potential_base:
-        if self.potential_base[location] > 4:
+        if self.potential_base[location] >= 3:
           self.potential_base[location] = 1
-          bases.add( (location, 4) )
+          self.location_history.visited( [location], now=-1, duplicate=4 )
       return bases
 
     def choose_troop_locations(self):
@@ -175,28 +189,17 @@ class ExpandThenSearch(ai.AI):
       # get some help over to troops under attack -- probably usually useless
       under_attack = [unit.position for unit in self.my_units if unit.is_under_attack]
       if len(under_attack) > 0:
-        self.location_history.visited( under_attack, now=1 )
+        self.location_history.visited( under_attack, now=-2 )
 
-      capturing_need_backup = set()
       for building in self.known_buildings:
         if building.team != self.team:
-          capturing_need_backup.add( (building, 5) )
+          self.location_history.visited( [building.position], now=-2, duplicate=5 )
 
       potential_bases = self.determine_potential_bases()
 
       for unit in self.my_units:
         if unit in self.guards:
           locations[unit] = self.guard_buildings[unit].position
-        elif len(capturing_need_backup) > 0:
-          building, count = capturing_need_backup.pop()
-          locations[unit] = building.position
-          if count > 0:
-            capturing_need_backup.add( (building, count-1) )
-        elif len(potential_bases):
-          location, count = potential_bases.pop()
-          locations[unit] = location
-          if count > 0:
-            potential_bases.add( (location, count-1) )
         else:
           locations[unit] = self.location_history.get_least_recently_visited_area( unit.position, exclude=locations.values() )
       return locations
