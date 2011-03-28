@@ -7,6 +7,11 @@ from world import isValidSquare
 
 AIClass = "RushAI"
 EXPLORER_RATIO=3
+AREA_SIZE = 8
+
+def to_area((x,y)):
+   return x/AREA_SIZE*AREA_SIZE, y/AREA_SIZE*AREA_SIZE 
+
 class RushAI(ai.AI):
     def __init__(self, *args, **kwargs):
         ai.AI.__init__(self, *args, **kwargs)
@@ -18,13 +23,14 @@ class RushAI(ai.AI):
       self.to_visit = set()
       self.destinations = {}
       self.buildings = {}
-      for i in xrange(self.mapsize):
-        for j in xrange(self.mapsize):
-          self.to_visit.add((i,j))
+      for i in xrange(self.mapsize/AREA_SIZE):
+        for j in xrange(self.mapsize/AREA_SIZE):
+          self.to_visit.add((i*AREA_SIZE,j*AREA_SIZE))
 
 
     def _spin(self):
-      self.to_visit.difference(set(self.visible_squares))
+      visible_areas = map(to_area, self.visible_squares)
+      self.to_visit.difference(visible_areas)
 
       for p in self.buildings:
         if self.buildings[p] not in self.visible_buildings:
@@ -87,32 +93,12 @@ class RushAI(ai.AI):
           self.positions[b.position].add(unit)
 
     def next_destination(self, unit):
-      # 0, 0 => 0, mapsize => mapsize, mapsize => mapsize, 0
-      x, y = unit.position
-      nx, ny = x, y
-      if x > y:
-        nx -= y
-        ny += x
-      else:
-        ny -= x
-        nx += y
+      if self.to_visit:
+        p = random.choice(list(self.to_visit))
+        return p
 
-      if nx >= self.mapsize:
-        nx = 0
-
-      if ny >= self.mapsize:
-        ny = 0
-
-      if ny == 0:
-        ny = random.randint(0, self.mapsize)
-
-      if nx == 0:
-        nx = random.randint(0, self.mapsize)
-
-      nx = max(0, min(self.mapsize, nx))
-      ny = max(0, min(self.mapsize, ny))
-
-      return nx, ny
+      rx,ry = random.randint(0, self.mapsize), random.randint(0, self.mapsize)
+      return rx,ry
 
 
     def explore_position(self, unit):
