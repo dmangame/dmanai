@@ -23,7 +23,7 @@ class ExpandingBlob(ai.AI):
 
         if max_victims > 0:
           unit.shoot(max_position)
-        elif unit in self.unit_locations and self.unit_locations[unit] != unit.position:
+        elif unit in self.unit_locations and self.unit_locations[unit] != unit.position and self.unit_locations[unit] is not None:
           unit.move(self.unit_locations[unit])
         else:
           for building in unit.visible_buildings:
