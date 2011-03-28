@@ -71,12 +71,12 @@ class RushAI(ai.AI):
         self.explorers[unit] = True
       else:
         if self.buildings:
-          min_size = 10000
+          min_dist = 10000
           min_pos = None
-          for pos in self.positions:
-            p_set = self.positions[pos]
-            if len(p_set) < min_size:
-              min_size = len(p_set)
+          for pos in self.buildings:
+            dist = unit.calcDistance(pos)
+            if dist < min_dist:
+              min_dist = dist
               min_pos = pos
 
           if not min_pos:
