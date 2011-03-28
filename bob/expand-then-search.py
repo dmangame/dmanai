@@ -49,9 +49,9 @@ def distance(a,b):
 
 class ExpandThenSearch(ai.AI):
 
-    area_size = 8
+    area_size = 20
     def expanding_init(self):
-      self.locations      = [(x*self.area_size,y*self.area_size) for x in xrange((self.mapsize+10)/self.area_size) for y in xrange((self.mapsize+10)/self.area_size)]
+      self.locations      = [(x*self.area_size,y*self.area_size) for x in xrange((self.mapsize+20)/self.area_size) for y in xrange((self.mapsize+20)/self.area_size)]
       self.location_units = {}
       self.unit_locations = {}
       self.guarded        = set()
@@ -100,8 +100,11 @@ class ExpandThenSearch(ai.AI):
       self.location_units[min_pos] = unit
 
     def expanding_unit_died(self, unit):
-      del self.location_units[self.unit_locations[unit]]
-      del self.unit_locations[unit]
+      try:
+        del self.location_units[self.unit_locations[unit]]
+        del self.unit_locations[unit]
+      except KeyError:
+        pass
       guarded_copy = copy.copy(self.guarded)
       for building in guarded_copy:
         if unit.position == building.position:
@@ -117,7 +120,11 @@ class ExpandThenSearch(ai.AI):
           if min_unit is not None:
             self.guarded.add(building)
             location = self.unit_locations[min_unit]
-            del self.location_units[location]
+            print min_unit,location
+            try:
+              del self.location_units[location]
+            except KeyError:
+              pass
             self.unit_locations[min_unit] = building.position
             self.location_units[building.position] = min_unit
             print 'moving',min_unit,'to become a guard of',building.position
@@ -129,6 +136,8 @@ class ExpandThenSearch(ai.AI):
       self.guard_buildings  = {}
       self.recently_visited = []
       self.location_history = LocationHistory(self.mapsize)
+      self.building_patrollers = {}
+      self.potential_base     = {}
 
     def allocate_guards(self):
       non_guards = list(set(self.my_units).difference(self.guards)) #assumes my_units are all alive
@@ -152,6 +161,14 @@ class ExpandThenSearch(ai.AI):
         print 'unable to allocate enough troops for guarding known buildings'
         return
 
+    def determine_potential_bases(self):
+      bases = set()
+      for location in self.potential_base:
+        if self.potential_base[location] > 4:
+          self.potential_base[location] = 1
+          bases.add( (location, 4) )
+      return bases
+
     def choose_troop_locations(self):
       locations = {}
 
@@ -163,26 +180,23 @@ class ExpandThenSearch(ai.AI):
       capturing_need_backup = set()
       for building in self.known_buildings:
         if building.team != self.team:
-          capturing_need_backup.add(building) #TODO choose number of buddies (and guards) per building based on how many we have
+          capturing_need_backup.add( (building, 5) )
 
-#      wait_for_buddy = False#len(self.my_units)-len(self.guards)-len(capturing_need_backup) <= 1
+      potential_bases = self.determine_potential_bases()
 
       for unit in self.my_units:
         if unit in self.guards:
           locations[unit] = self.guard_buildings[unit].position
         elif len(capturing_need_backup) > 0:
-          locations[unit] = capturing_need_backup.pop().position
-        #TODO if we think we know where an enemy might be, we should hunt them down
-#        elif wait_for_buddy:
-#          min_distance = float('inf')
-#          min_position = self.location_history.get_least_recently_visited_area( unit.position, exclude=locations.values() )
-#          for building in self.known_buildings:
-#            if building.team == self.team:
-#              distance = (building.position[0]-unit.position[0])**2+(building.position[1]-unit.position[1])**2
-#              if distance < min_distance:
-#                min_distance = distance
-#                min_position = building.position
-#          locations[unit] = min_position
+          building, count = capturing_need_backup.pop()
+          locations[unit] = building.position
+          if count > 0:
+            capturing_need_backup.add( (building, count-1) )
+        elif len(potential_bases):
+          location, count = potential_bases.pop()
+          locations[unit] = location
+          if count > 0:
+            potential_bases.add( (location, count-1) )
         else:
           locations[unit] = self.location_history.get_least_recently_visited_area( unit.position, exclude=locations.values() )
       return locations
@@ -226,12 +240,12 @@ class ExpandThenSearch(ai.AI):
       self.expanding = True
 
     def _spin(self):
-      if not self.expanding and len(self.my_units) <= 5: #N
+      if not self.expanding and len(self.my_units) <= 4: #N
         # retreat!!
         self.expanding = True
         self.expanding_init()
         [self.expanding_unit_spawned(unit) for unit in self.my_units]
-      elif self.expanding and len(self.my_units) > 5:
+      elif self.expanding and len(self.my_units) > 4:
         self.expanding = False
 
       if self.expanding:
@@ -244,3 +258,6 @@ class ExpandThenSearch(ai.AI):
 
     def _unit_died(self,unit):
       self.expanding_unit_died(unit)
+      rpos = (unit.position[0]/15, unit.position[1]/15)
+      self.potential_base.setdefault(rpos, 0)
+      self.potential_base[rpos] += 1
