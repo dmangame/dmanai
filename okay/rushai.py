@@ -41,6 +41,19 @@ class RushAI(ai.AI):
       for unit in self.defenders:
         self.defend_position(unit, self.defenders[unit])
 
+      for pos in self.positions:
+        p_set = self.positions[pos]
+        if len(p_set) >= 2*EXPLORER_RATIO:
+          ordered_list = list(p_set)
+          leave = ordered_list[:EXPLORER_RATIO]
+          stay = ordered_list[EXPLORER_RATIO+1:]
+          for p in self.buildings:
+            if self.buildings[p] not in self.visible_buildings:
+              for unit in leave:
+                self.defenders[unit] = p
+                self.defend_position(unit, p)
+                p_set.remove(unit)
+
       for unit in self.explorers:
         self.explore_position(unit)
 
@@ -54,11 +67,22 @@ class RushAI(ai.AI):
         self.defenders[unit] = unit.position
         return
 
-      if not self.explorers or len(self.defenders) / len(self.explorers) > EXPLORER_RATIO:
+      if not self.explorers or len(self.defenders) - len(self.explorers) > EXPLORER_RATIO:
         self.explorers[unit] = True
       else:
         if self.buildings:
-          b = random.choice(self.buildings.values())
+          min_size = 10000
+          min_pos = None
+          for pos in self.positions:
+            p_set = self.positions[pos]
+            if len(p_set) < min_size:
+              min_size = len(p_set)
+              min_pos = pos
+
+          if not min_pos:
+            b = random.choice(self.buildings.values())
+          else:
+            b = self.buildings[min_pos]
           self.defenders[unit] = b.position
           self.positions[b.position].add(unit)
 
@@ -160,7 +184,7 @@ class RushAI(ai.AI):
       if unit in self.defenders:
         del self.defenders[unit]
 
-      for p_set in self.positions:
-        if unit in p_set:
-          p_set.remove(unit)
+      for pos in self.positions:
+        if unit in self.positions[pos]:
+          self.positions[pos].remove(unit)
 
