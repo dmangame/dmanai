@@ -14,7 +14,7 @@ class RushAI(ai.AI):
     def _init(self):
       self.defenders = {}
       self.explorers = {}
-      self.positions = {}
+      self.positions = defaultdict(set)
       self.to_visit = set()
       self.destinations = {}
       self.buildings = {}
