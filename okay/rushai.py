@@ -163,14 +163,14 @@ class RushAI(ai.AI):
             sight = unit.sight - 2
 
             dx = int((sight - random.randint(1, 5)) * random.choice([-1, 1]))
-            dy = sight - abs(dx) * random.choice([-1, 1])
+            dy = (sight - abs(dx)) * random.choice([-1, 1])
 
             x += dx
             y += dy
             while not isValidSquare((x,y), self.mapsize):
               x,y = b.position
               dx = int((sight - random.randint(1, 5)) * random.choice([-1, 1]))
-              dy = sight - abs(dx) * random.choice([-1, 1])
+              dy = (sight - abs(dx)) * random.choice([-1, 1])
               x += dx
               y += dy
             unit.move((x,y))
