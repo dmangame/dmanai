@@ -12,17 +12,20 @@ AREA_SIZE = 8
 
 def fuzz_position((x, y), sight, mapsize):
   dx = int((sight - random.randint(0, 3)) * random.choice([-1, 1]))
-  dy = (sight - abs(dx)) * random.choice([-1, 1])
+  dy = int((sight - random.randint(0, 3)) * random.choice([-1, 1]))
 
   ox,oy = x,y
   x += dx
   y += dy
-  while not isValidSquare((x,y), mapsize):
+  attempts = 30
+  while not isValidSquare((x,y), mapsize) and attempts > 0:
     x,y = ox,oy
     dx = int((sight - random.randint(0, 3)) * random.choice([-1, 1]))
-    dy = (sight - abs(dx)) * random.choice([-1, 1])
+    dy = abs(sight - abs(dx)) * random.choice([-1, 1])
     x += dx
     y += dy
+    attempts -= 1
+  return x,y
 
   return int(x),int(y)
 def to_area((x,y)):
@@ -65,7 +68,8 @@ class RushAI(ai.AI):
             if self.buildings[p] not in self.visible_buildings:
               self.surround_position(leave, p)
               for unit in leave:
-                p_set.remove(unit)
+                if unit in p_set:
+                  p_set.remove(unit)
 
       for unit in self.explorers:
         if self.explorers[unit]: self.explore_position(unit)
@@ -131,7 +135,7 @@ class RushAI(ai.AI):
 
 
         for b in unit.visible_buildings:
-          if not b.team == self.team and len(self.visible_enemies) <= 1:
+          if not b.team == self.team:
             self.capture_building(unit, b)
             return
 
@@ -145,7 +149,8 @@ class RushAI(ai.AI):
         unit.position == self.destinations[unit]:
         destination = self.next_destination(unit)
         if not destination:
-          self.capture_building(random.choice(self.buildings))
+          self.capture_building(unit, random.choice(self.buildings.values()))
+          return
         self.destinations[unit] = destination
         self.visiting[destination] = unit
       unit.move(self.destinations[unit])
@@ -162,9 +167,7 @@ class RushAI(ai.AI):
       corners = [[-1, 1], [1, 1], [-1, -1], [1, -1]]
       corner_cycler = itertools.cycle(corners)
       for unit in units:
-        sight = self.sights[unit]
-        p = map(lambda x: x*sight, next(corner_cycler))
-        x,y = fuzz_position(p, sight, self.mapsize)
+        x,y = fuzz_position(position, unit.sight, self.mapsize)
         unit.move((x,y))
         self.explorers[unit] = True
         self.destinations[unit] = (x,y)
