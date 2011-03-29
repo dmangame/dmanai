@@ -1,6 +1,7 @@
 import ai
 import time
 import copy
+from collections import defaultdict
 AIClass="ExpandThenSearch"
 
 #just a merge of expanding-blob then searcher if more than N units
@@ -10,7 +11,7 @@ class LocationHistory:
     def __init__(self, size):
       areas = [(x*self.area_size,y*self.area_size) for x in xrange((size+10)/self.area_size) for y in xrange((size+10)/self.area_size)]
       self.visit_time_positions = {0: areas}
-      self.position_visit_times = dict((area,0) for area in areas)
+      self.position_visit_times = defaultdict(int)
       self.duplicates = {}
       self.duplicated = {}
 
