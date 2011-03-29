@@ -2,6 +2,7 @@
 import ai
 import random
 import itertools
+from operator import attrgetter
 from collections import defaultdict
 from world import isValidSquare
 
@@ -10,7 +11,7 @@ EXPLORER_RATIO=3
 AREA_SIZE = 8
 
 def to_area((x,y)):
-   return x/AREA_SIZE*AREA_SIZE, y/AREA_SIZE*AREA_SIZE 
+   return x/AREA_SIZE*AREA_SIZE, y/AREA_SIZE*AREA_SIZE
 
 class RushAI(ai.AI):
     def __init__(self, *args, **kwargs):
@@ -29,17 +30,17 @@ class RushAI(ai.AI):
 
 
     def _spin(self):
-      visible_areas = map(to_area, self.visible_squares)
+      visible_areas = map(to_area, map(attrgetter('position'), self.my_units))
       self.to_visit.difference(visible_areas)
 
-      for p in self.buildings:
-        if self.buildings[p] not in self.visible_buildings:
-          # Pick an explorer at random
-          if self.explorers:
-            e = random.choice(self.explorers.keys())
-            self.defenders[e] = p
-            self.defend_position(e, p)
-            del self.explorers[e]
+#      for p in self.buildings:
+#        if self.buildings[p] not in self.visible_buildings:
+#          # Pick an explorer at random
+#          if self.explorers:
+#            e = random.choice(self.explorers.keys())
+#            self.defenders[e] = p
+#            self.defend_position(e, p)
+#            del self.explorers[e]
 
       for b in self.visible_buildings:
         self.buildings[b.position] = b
@@ -51,8 +52,8 @@ class RushAI(ai.AI):
         p_set = self.positions[pos]
         if len(p_set) >= 2*EXPLORER_RATIO:
           ordered_list = list(p_set)
-          leave = ordered_list[:EXPLORER_RATIO]
-          stay = ordered_list[EXPLORER_RATIO+1:]
+          stay = ordered_list[:EXPLORER_RATIO]
+          leave = ordered_list[EXPLORER_RATIO+1:]
           for p in self.buildings:
             if self.buildings[p] not in self.visible_buildings:
               for unit in leave:
@@ -73,7 +74,7 @@ class RushAI(ai.AI):
         self.defenders[unit] = unit.position
         return
 
-      if not self.explorers or len(self.defenders) - len(self.explorers) > EXPLORER_RATIO:
+      if len(self.explorers) < len(self.my_buildings):
         self.explorers[unit] = True
       else:
         if self.buildings:
@@ -140,7 +141,16 @@ class RushAI(ai.AI):
 
       if b in self.visible_buildings:
         if unit.visible_enemies:
-          unit.shoot(unit.visible_enemies[0].position)
+          for e in unit.visible_enemies:
+            ff = False
+            for vunit in unit.calcVictims(e.position):
+              if vunit.team == self.team:
+                ff = True
+                break
+
+            if not ff:
+              unit.shoot(e.position)
+              return
         else:
           if unit.is_capturing:
             return
@@ -150,13 +160,19 @@ class RushAI(ai.AI):
 
           if unit.position == b.position:
             x,y = b.position
-            x += random.randint(3, 5) * random.choice([-1,1])
-            y += random.randint(3, 5) * random.choice([-1,1])
+            sight = unit.sight - 2
 
+            dx = int((sight - random.randint(1, 5)) * random.choice([-1, 1]))
+            dy = sight - abs(dx) * random.choice([-1, 1])
+
+            x += dx
+            y += dy
             while not isValidSquare((x,y), self.mapsize):
               x,y = b.position
-              x += random.randint(3, 5) * random.choice([-1,1])
-              y += random.randint(3, 5) * random.choice([-1,1])
+              dx = int((sight - random.randint(1, 5)) * random.choice([-1, 1]))
+              dy = sight - abs(dx) * random.choice([-1, 1])
+              x += dx
+              y += dy
             unit.move((x,y))
       else:
         if unit.is_capturing:
