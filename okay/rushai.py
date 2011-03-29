@@ -7,21 +7,36 @@ from collections import defaultdict
 from world import isValidSquare
 
 AIClass = "RushAI"
-EXPLORER_RATIO=3
+EXPLORER_RATIO=4
 AREA_SIZE = 8
 
+def fuzz_position((x, y), sight, mapsize):
+  dx = int((sight - random.randint(0, 3)) * random.choice([-1, 1]))
+  dy = (sight - abs(dx)) * random.choice([-1, 1])
+
+  ox,oy = x,y
+  x += dx
+  y += dy
+  while not isValidSquare((x,y), mapsize):
+    x,y = ox,oy
+    dx = int((sight - random.randint(0, 3)) * random.choice([-1, 1]))
+    dy = (sight - abs(dx)) * random.choice([-1, 1])
+    x += dx
+    y += dy
+
+  return int(x),int(y)
 def to_area((x,y)):
    return x/AREA_SIZE*AREA_SIZE, y/AREA_SIZE*AREA_SIZE
 
 class RushAI(ai.AI):
-    def __init__(self, *args, **kwargs):
-        ai.AI.__init__(self, *args, **kwargs)
-
     def _init(self):
+      AREA_SIZE = self.mapsize / 12
+      self.sights = {}
       self.defenders = {}
       self.explorers = {}
       self.positions = defaultdict(set)
       self.to_visit = set()
+      self.visiting = {}
       self.destinations = {}
       self.buildings = {}
       for i in xrange(self.mapsize/AREA_SIZE):
@@ -30,17 +45,9 @@ class RushAI(ai.AI):
 
 
     def _spin(self):
-      visible_areas = map(to_area, map(attrgetter('position'), self.my_units))
-      self.to_visit.difference(visible_areas)
+      positions = [to_area(u.position) for u in self.my_units]
+      self.to_visit.difference_update(positions)
 
-#      for p in self.buildings:
-#        if self.buildings[p] not in self.visible_buildings:
-#          # Pick an explorer at random
-#          if self.explorers:
-#            e = random.choice(self.explorers.keys())
-#            self.defenders[e] = p
-#            self.defend_position(e, p)
-#            del self.explorers[e]
 
       for b in self.visible_buildings:
         self.buildings[b.position] = b
@@ -56,25 +63,26 @@ class RushAI(ai.AI):
           leave = ordered_list[EXPLORER_RATIO+1:]
           for p in self.buildings:
             if self.buildings[p] not in self.visible_buildings:
+              self.surround_position(leave, p)
               for unit in leave:
-                self.defenders[unit] = p
-                self.defend_position(unit, p)
                 p_set.remove(unit)
 
       for unit in self.explorers:
-        self.explore_position(unit)
+        if self.explorers[unit]: self.explore_position(unit)
 
       if not self.defenders and self.buildings:
+        b = random.choice(self.buildings.values())
         for unit in self.explorers:
-          b = random.choice(self.buildings.values())
           self.defenders[unit] = b.position
 
     def _unit_spawned(self, unit):
+      self.sights[unit] = unit.sight
+
       if self.current_turn == 1:
         self.defenders[unit] = unit.position
         return
 
-      if len(self.explorers) < len(self.my_buildings):
+      if len(self.explorers) < len(self.my_buildings) or len(self.defenders) / len(self.explorers) > EXPLORER_RATIO :
         self.explorers[unit] = True
       else:
         if self.buildings:
@@ -95,8 +103,20 @@ class RushAI(ai.AI):
 
     def next_destination(self, unit):
       if self.to_visit:
-        p = random.choice(list(self.to_visit))
-        return p
+        min_dist = 1000000
+        min_pos = None
+        for pos in self.to_visit:
+          if pos in self.visiting:
+            continue
+          cur_dist = unit.calcDistance(pos)
+          if cur_dist < self.mapsize / 8:
+            return pos
+
+          if min_dist > cur_dist:
+            min_pos = pos
+            min_dist = cur_dist
+
+        return min_pos
 
       rx,ry = random.randint(0, self.mapsize), random.randint(0, self.mapsize)
       return rx,ry
@@ -111,9 +131,10 @@ class RushAI(ai.AI):
 
 
         for b in unit.visible_buildings:
-          if not b.team == self.team:
+          if not b.team == self.team and len(self.visible_enemies) <= 1:
             self.capture_building(unit, b)
             return
+
       if unit.visible_buildings:
         for b in unit.visible_buildings:
           if not b.team == self.team:
@@ -123,15 +144,31 @@ class RushAI(ai.AI):
       if not unit in self.destinations or\
         unit.position == self.destinations[unit]:
         destination = self.next_destination(unit)
+        if not destination:
+          self.capture_building(random.choice(self.buildings))
         self.destinations[unit] = destination
-      else:
-        unit.move(self.destinations[unit])
+        self.visiting[destination] = unit
+      unit.move(self.destinations[unit])
 
     def capture_building(self, unit, b):
       if not unit.position == b.position:
         unit.move(b.position)
       else:
         unit.capture(b)
+        self.explorers[unit] = False
+        self.defenders[unit] = b.position
+
+    def surround_position(self, units, position):
+      corners = [[-1, 1], [1, 1], [-1, -1], [1, -1]]
+      corner_cycler = itertools.cycle(corners)
+      for unit in units:
+        sight = self.sights[unit]
+        p = map(lambda x: x*sight, next(corner_cycler))
+        x,y = fuzz_position(p, sight, self.mapsize)
+        unit.move((x,y))
+        self.explorers[unit] = True
+        self.destinations[unit] = (x,y)
+
 
     def defend_position(self, unit, position):
       b = self.buildings[position]
@@ -142,47 +179,29 @@ class RushAI(ai.AI):
       if b in self.visible_buildings:
         if unit.visible_enemies:
           for e in unit.visible_enemies:
-            ff = False
-            for vunit in unit.calcVictims(e.position):
-              if vunit.team == self.team:
-                ff = True
-                break
-
-            if not ff:
+            if unit.calcVictims(e.position):
               unit.shoot(e.position)
               return
         else:
-          if unit.is_capturing:
-            return
           if not b.team == self.team:
             self.capture_building(unit, b)
             return
 
-          if unit.position == b.position:
+          if unit.position == b.position or \
+             unit.calcDistance(b.position) > unit.sight:
             x,y = b.position
-            sight = unit.sight - 2
+            sight = self.sights[unit] - 2
 
-            dx = int((sight - random.randint(1, 5)) * random.choice([-1, 1]))
-            dy = (sight - abs(dx)) * random.choice([-1, 1])
-
-            x += dx
-            y += dy
-            while not isValidSquare((x,y), self.mapsize):
-              x,y = b.position
-              dx = int((sight - random.randint(1, 5)) * random.choice([-1, 1]))
-              dy = (sight - abs(dx)) * random.choice([-1, 1])
-              x += dx
-              y += dy
+            x,y = fuzz_position((x,y), sight, self.mapsize)
             unit.move((x,y))
       else:
-        if unit.is_capturing:
-          return
         unit.move(position)
 
 
     def _unit_died(self, unit):
       if unit in self.explorers:
         del self.explorers[unit]
+
       if unit in self.defenders:
         del self.defenders[unit]
 
