@@ -148,6 +148,18 @@ class RushAI(ai.AI):
 
       if not unit in self.destinations or\
         unit.position == self.destinations[unit]:
+        if self.attack[unit]:
+          min_p = 1000000
+          min_b = None
+          for p in self.buildings:
+            if min_p > p:
+              min_p = p
+              min_b = b
+
+          if min_b:
+            self.capture_building(unit, min_b)
+            return
+
         destination = self.next_destination(unit)
         if not destination:
           self.capture_building(unit, random.choice(self.buildings.values()))
