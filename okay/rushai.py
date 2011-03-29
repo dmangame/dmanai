@@ -40,6 +40,7 @@ class RushAI(ai.AI):
       self.positions = defaultdict(set)
       self.to_visit = set()
       self.visiting = {}
+      self.attack = defaultdict(bool)
       self.destinations = {}
       self.buildings = {}
       for i in xrange(self.mapsize/AREA_SIZE):
@@ -128,9 +129,9 @@ class RushAI(ai.AI):
 
     def explore_position(self, unit):
       if unit.visible_enemies:
-        for e in unit.visible_enemies:
-          if e.position == unit.position:
-            unit.shoot(unit.position)
+        for e in unit.in_range_enemies:
+          if e.position == unit.position or self.attack[unit]:
+            unit.shoot(e.position)
             return
 
 
@@ -161,6 +162,7 @@ class RushAI(ai.AI):
       else:
         unit.capture(b)
         self.explorers[unit] = False
+        self.attack[unit] = False
         self.defenders[unit] = b.position
 
     def surround_position(self, units, position):
@@ -169,6 +171,7 @@ class RushAI(ai.AI):
       for unit in units:
         x,y = fuzz_position(position, unit.sight, self.mapsize)
         unit.move((x,y))
+        self.attack[unit] = True
         self.explorers[unit] = True
         self.destinations[unit] = (x,y)
 
