@@ -123,11 +123,13 @@ class ExpandThenSearch(ai.AI):
       for building in guarded_copy:
         if unit.position == building.position:
           print 'we lost a guard!!'
+          if len(self.guarded) == 1:
+            last_known_building = building
           self.guarded.remove(building)
           min_dist = float('inf')
           min_unit = None
           for xunit in self.my_units:
-            dist = distance(xunit.position,building.position) #TODO make sure this one isn't guarding something else
+            dist = distance(xunit.position,building.position)
             if xunit != unit and xunit.is_alive and dist < min_dist:
               min_unit = xunit
               min_dist = dist
@@ -180,7 +182,7 @@ class ExpandThenSearch(ai.AI):
       for location in self.potential_base:
         if self.potential_base[location] >= 3:
           self.potential_base[location] = 1
-          self.location_history.visited( [location], now=-1, duplicate=4 )
+          self.location_history.visited( [location], now=-1, duplicate=5 )
       return bases
 
     def choose_troop_locations(self):
@@ -193,7 +195,7 @@ class ExpandThenSearch(ai.AI):
 
       for building in self.known_buildings:
         if building.team != self.team:
-          self.location_history.visited( [building.position], now=-2, duplicate=5 )
+          self.location_history.visited( [building.position], now=-2, duplicate=100 )
 
       potential_bases = self.determine_potential_bases()
 
@@ -211,16 +213,28 @@ class ExpandThenSearch(ai.AI):
           if building.team != unit.team and unit.position == building.position:
             capture = building
 
-        max_victims = 0
-        max_position = None
+        max_victims  = 0, 0
+        max_unit     = None
         for enemy in unit.visible_enemies:
-          num_victims = len(unit.calcVictims(enemy.position))
-          if num_victims > max_victims:
-            max_victims = num_victims
-            max_position = enemy.position
+          if enemy.position == unit.position:
+            max_victims  = 1
+            max_unit     = enemy
+            break # definitely kill this guy
+#          elif not enemy.is_moving:
+#            max_victims  = 4
+#            max_unit     = enemy
+#            # we may want to shoot, but its not likely, and if we are on someone, we have to kill them
+          victims = unit.calcVictims(enemy.position)
+          num_victims = len(victims), 10*len(victims)-sum(victim.energy for victim in victims)
+          if (num_victims) > max_victims:
+            max_victims  = num_victims
+            max_unit     = enemy
 
-        if max_victims > 0:
-          unit.shoot(max_position)
+        if max_victims > (0,0):
+#          if not max_unit.is_moving and max_unit.position != unit.position:
+#              unit.move(max_unit.position)
+#          else:
+            unit.shoot(max_unit.position)
         elif capture is not None:
           unit.capture(capture)
         else:
@@ -243,12 +257,12 @@ class ExpandThenSearch(ai.AI):
       self.expanding = True
 
     def _spin(self):
-      if not self.expanding and len(self.my_units) <= 4: #N
+      if not self.expanding and len(self.my_units) <= 3: #N
         # retreat!!
         self.expanding = True
         self.expanding_init()
         [self.expanding_unit_spawned(unit) for unit in self.my_units]
-      elif self.expanding and len(self.my_units) > 4:
+      if self.expanding and len(self.my_units) > 4:
         self.expanding = False
 
       if self.expanding:
