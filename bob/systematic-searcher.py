@@ -1,14 +1,18 @@
 import ai
 import time
-
+import copy
 AIClass="SystematicSearcher"
 
+#just a merge of expanding-blob then searcher if more than N units
+
 class LocationHistory:
-    area_size = 8
+    area_size = 15
     def __init__(self, size):
       areas = [(x*self.area_size,y*self.area_size) for x in xrange((size+10)/self.area_size) for y in xrange((size+10)/self.area_size)]
       self.visit_time_positions = {0: areas}
       self.position_visit_times = dict((area,0) for area in areas)
+      self.duplicates = {}
+      self.duplicated = {}
 
     def get_least_recently_visited_area(self, my_location, exclude):
       visit_times = sorted(self.visit_time_positions.keys())
@@ -16,7 +20,13 @@ class LocationHistory:
       min_location = my_location #stay put if everything is already excluded, we probably won
       for visit_time in visit_times:
         for area in self.visit_time_positions[visit_time]:
-          if area in exclude:
+          if area in exclude and area in self.duplicates:
+            self.duplicates[area] -= 1
+            self.duplicated.setdefault(area,0)
+            self.duplicated[area] += 1
+            if self.duplicates[area] == 1:
+              del self.duplicates[area]
+          elif area in exclude:
             continue
           distance = (my_location[0]-area[0])**2+(my_location[1]-area[1])**2
           if distance < min_distance:
@@ -26,14 +36,20 @@ class LocationHistory:
           break
       return min_location
 
-    def visited(self, positions, now=None):
+    def visited(self, positions, now=None, duplicate=1):
       if now is None:
         now = int(time.time()*10000)
-      while now in self.visit_time_positions:
-        now += 1
-      self.visit_time_positions[now] = []
+      if now not in self.visit_time_positions:
+        self.visit_time_positions[now] = []
       for rpos in positions:
         position = (int(rpos[0]/self.area_size)*self.area_size,int(rpos[1]/self.area_size)*self.area_size)
+        if position in self.duplicated:
+          self.duplicated[position] -= 1
+          if self.duplicated[position] == 0:
+            del self.duplicated[position]
+          continue
+        if duplicate > 1:
+          self.duplicates[position] = duplicate
         self.visit_time_positions[now].append(position)
         previous = self.position_visit_times[position]
         self.position_visit_times[position] = now
@@ -41,8 +57,12 @@ class LocationHistory:
         if len(self.visit_time_positions[previous]) == 0:
           del self.visit_time_positions[previous]
 
+
+def distance(a,b):
+  return (a[0]-b[0])**2+(a[1]-b[1])**2
+
 class SystematicSearcher(ai.AI):
-    #color = (0,1,0)
+
     def _init(self):
       self.guards           = set()
       self.known_buildings  = set()
@@ -50,6 +70,8 @@ class SystematicSearcher(ai.AI):
       self.guard_buildings  = {}
       self.recently_visited = []
       self.location_history = LocationHistory(self.mapsize)
+      self.building_patrollers = {}
+      self.potential_base     = {}
 
     def allocate_guards(self):
       non_guards = list(set(self.my_units).difference(self.guards)) #assumes my_units are all alive
@@ -73,37 +95,31 @@ class SystematicSearcher(ai.AI):
         print 'unable to allocate enough troops for guarding known buildings'
         return
 
+    def determine_potential_bases(self):
+      bases = set()
+      for location in self.potential_base:
+        if self.potential_base[location] >= 3:
+          self.potential_base[location] = 1
+          self.location_history.visited( [location], now=-1, duplicate=4 )
+      return bases
+
     def choose_troop_locations(self):
       locations = {}
 
       # get some help over to troops under attack -- probably usually useless
       under_attack = [unit.position for unit in self.my_units if unit.is_under_attack]
       if len(under_attack) > 0:
-        self.location_history.visited( under_attack, now=1 )
+        self.location_history.visited( under_attack, now=-2 )
 
-      capturing_need_backup = set()
       for building in self.known_buildings:
         if building.team != self.team:
-          capturing_need_backup.add(building) #TODO choose number of buddies (and guards) per building based on how many we have
+          self.location_history.visited( [building.position], now=-2, duplicate=5 )
 
-#      wait_for_buddy = False#len(self.my_units)-len(self.guards)-len(capturing_need_backup) <= 1
+      potential_bases = self.determine_potential_bases()
 
       for unit in self.my_units:
         if unit in self.guards:
           locations[unit] = self.guard_buildings[unit].position
-        elif len(capturing_need_backup) > 0:
-          locations[unit] = capturing_need_backup.pop().position
-        #TODO if we think we know where an enemy might be, we should hunt them down
-#        elif wait_for_buddy:
-#          min_distance = float('inf')
-#          min_position = self.location_history.get_least_recently_visited_area( unit.position, exclude=locations.values() )
-#          for building in self.known_buildings:
-#            if building.team == self.team:
-#              distance = (building.position[0]-unit.position[0])**2+(building.position[1]-unit.position[1])**2
-#              if distance < min_distance:
-#                min_distance = distance
-#                min_position = building.position
-#          locations[unit] = min_position
         else:
           locations[unit] = self.location_history.get_least_recently_visited_area( unit.position, exclude=locations.values() )
       return locations
@@ -115,16 +131,28 @@ class SystematicSearcher(ai.AI):
           if building.team != unit.team and unit.position == building.position:
             capture = building
 
-        max_victims = 0
-        max_position = None
+        max_victims  = 0, 0
+        max_unit     = None
         for enemy in unit.visible_enemies:
-          num_victims = len(unit.calcVictims(enemy.position))
-          if num_victims > max_victims:
-            max_victims = num_victims
-            max_position = enemy.position
+          if enemy.position == unit.position:
+            max_victims  = 1
+            max_unit     = enemy
+            break # definitely kill this guy
+          elif not enemy.is_moving:
+            max_victims  = 4
+            max_unit     = enemy
+            # we may want to shoot, but its not likely, and if we are on someone, we have to kill them
+          victims = unit.calcVictims(enemy.position)
+          num_victims = len(victims), 10*len(victims)-sum(victim.energy for victim in victims)
+          if (num_victims) > max_victims:
+            max_victims  = num_victims
+            max_unit     = enemy
 
-        if max_victims > 0:
-          unit.shoot(max_position)
+        if max_victims > (0,0):
+          if not max_unit.is_moving and max_unit.position != unit.position:
+              unit.move(max_unit.position)
+          else:
+            unit.shoot(max_unit.position)
         elif capture is not None:
           unit.capture(capture)
         else:
@@ -141,5 +169,7 @@ class SystematicSearcher(ai.AI):
 
       self.attack_or_move_troops(locations)
 
-    def _new_unit(self, unit):
-      print "Received a new unit: %s" % unit
+    def _unit_died(self,unit):
+      rpos = (unit.position[0]/15, unit.position[1]/15)
+      self.potential_base.setdefault(rpos, 0)
+      self.potential_base[rpos] += 1
