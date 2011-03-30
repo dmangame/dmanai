@@ -151,7 +151,7 @@ class RushAI(ai.AI):
             dist = unit.calcDistance(p)
             if min_p > dist:
               min_p = dist
-              min_b = b
+              min_b = self.buildings[p]
 
           if min_b:
             self.capture_building(unit, min_b)
