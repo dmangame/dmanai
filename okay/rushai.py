@@ -34,15 +34,18 @@ def to_area((x,y)):
 class RushAI(ai.AI):
     def _init(self):
       AREA_SIZE = self.mapsize / 12
-      self.sights = {}
+
+      self.buildings = {}
       self.defenders = {}
+      self.destinations = {}
       self.explorers = {}
-      self.positions = defaultdict(set)
+      self.sights = {}
       self.to_visit = set()
       self.visiting = {}
-      self.attack = defaultdict(bool)
-      self.destinations = {}
-      self.buildings = {}
+
+      self.aggressive = defaultdict(bool)
+      self.positions = defaultdict(set)
+
       for i in xrange(self.mapsize/AREA_SIZE):
         for j in xrange(self.mapsize/AREA_SIZE):
           self.to_visit.add((i*AREA_SIZE,j*AREA_SIZE))
@@ -52,13 +55,23 @@ class RushAI(ai.AI):
       positions = [to_area(u.position) for u in self.my_units]
       self.to_visit.difference_update(positions)
 
-
       for b in self.visible_buildings:
         self.buildings[b.position] = b
 
-      for unit in self.defenders:
-        self.defend_position(unit, self.defenders[unit])
+      for unit in self.my_units:
+        if unit in self.defenders:
+          self.defend_position(unit, self.defenders[unit])
 
+        if unit in self.explorers:
+          self.explore_position(unit)
+
+      if not self.defenders and self.buildings:
+        b = random.choice(self.buildings.values())
+        for unit in self.explorers:
+          self.capture_building(unit, b)
+
+      # If we have enough units at a base, send them on the
+      # offensive
       for pos in self.positions:
         p_set = self.positions[pos]
         if len(p_set) >= 2*EXPLORER_RATIO:
@@ -71,14 +84,6 @@ class RushAI(ai.AI):
               for unit in leave:
                 if unit in p_set:
                   p_set.remove(unit)
-
-      for unit in self.explorers:
-        if self.explorers[unit]: self.explore_position(unit)
-
-      if not self.defenders and self.buildings:
-        b = random.choice(self.buildings.values())
-        for unit in self.explorers:
-          self.defenders[unit] = b.position
 
     def _unit_spawned(self, unit):
       self.sights[unit] = unit.sight
@@ -108,13 +113,14 @@ class RushAI(ai.AI):
 
     def next_destination(self, unit):
       global AREA_SIZE
-      if not self.to_visit:
+      if len(self.to_visit) < len(self.visiting):
+        self.visiting.clear()
         AREA_SIZE /= 2
         for i in xrange(self.mapsize/AREA_SIZE):
           for j in xrange(self.mapsize/AREA_SIZE):
             self.to_visit.add((i*AREA_SIZE,j*AREA_SIZE))
 
-      min_dist = 1000000
+      min_dist = 10000000000
       min_pos = None
       for pos in self.to_visit:
         if pos in self.visiting:
@@ -130,9 +136,12 @@ class RushAI(ai.AI):
       return min_pos
 
     def explore_position(self, unit):
+
+      # If we see any visible enemies and there is more than one or we are
+      # aggressive, attack them.
       ve = unit.in_range_enemies
       for e in ve:
-        if e.position == unit.position or self.attack[unit] or len(ve) > 1:
+        if e.position == unit.position or self.aggressive[unit] or len(ve) > 1:
           unit.shoot(e.position)
           return
 
@@ -144,27 +153,30 @@ class RushAI(ai.AI):
 
       if not unit in self.destinations or\
         unit.position == self.destinations[unit]:
-        if self.attack[unit]:
-          min_p = 1000000
-          min_b = None
-          for p in self.buildings:
-            dist = unit.calcDistance(p)
-            if min_p > dist:
-              min_p = dist
-              min_b = self.buildings[p]
-
-          if min_b:
-            self.capture_building(unit, min_b)
-            return
-
+#        if self.aggressive[unit]:
+#          min_p = 1000000
+#          min_b = None
+#          for p in self.buildings:
+#            dist = unit.calcDistance(p)
+#            if min_p > dist:
+#              min_p = dist
+#              min_b = self.buildings[p]
+#
+#          if min_b:
+#            self.capture_building(unit, min_b)
+#            return
+#
         destination = self.next_destination(unit)
+        print destination
         if not destination:
           self.capture_building(unit,
             random.choice(self.buildings.values()))
-          self.attack[unit] = True
+          self.aggressive[unit] = True
           return
-        self.destinations[unit] = destination
-        self.visiting[destination] = unit
+        else:
+          self.destinations[unit] = destination
+          self.visiting[destination] = unit
+
       unit.move(self.destinations[unit])
 
     def capture_building(self, unit, b):
@@ -172,27 +184,26 @@ class RushAI(ai.AI):
         unit.move(b.position)
       else:
         unit.capture(b)
-        self.explorers[unit] = False
-        self.attack[unit] = False
+        del self.explorers[unit]
+        self.aggressive[unit] = False
         self.defenders[unit] = b.position
+        self.positions[b.position].add(unit)
 
     def surround_position(self, units, position):
-      corners = [[-1, 1], [1, 1], [-1, -1], [1, -1]]
-      corner_cycler = itertools.cycle(corners)
       for unit in units:
         x,y = fuzz_position(position, unit.sight, self.mapsize)
         unit.move((x,y))
-        self.attack[unit] = True
+        self.aggressive[unit] = True
         self.defenders[unit] = position
         self.destinations[unit] = (x,y)
 
 
     def defend_position(self, unit, position):
-      b = self.buildings[position]
       if unit.is_capturing:
         return
 
 
+      b = self.buildings[position]
       if b in self.visible_buildings:
         ve = unit.in_range_enemies
         if ve:
@@ -212,7 +223,11 @@ class RushAI(ai.AI):
             x,y = fuzz_position((x,y), sight, self.mapsize)
             unit.move((x,y))
       else:
-        unit.move(position)
+        ve = unit.in_range_enemies
+        if ve:
+          unit.shoot(ve[0].position)
+        else:
+          unit.move(position)
 
 
     def _unit_died(self, unit):
