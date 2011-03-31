@@ -43,6 +43,7 @@ class RushAI(ai.AI):
       self.to_visit = set()
       self.visiting = {}
 
+      self.explorer_death_positions = defaultdict(int)
       self.aggressive = defaultdict(bool)
       self.positions = defaultdict(set)
 
@@ -67,7 +68,10 @@ class RushAI(ai.AI):
 
       if not self.defenders and self.buildings:
         b = random.choice(self.buildings.values())
+        capturers = []
         for unit in self.explorers:
+          capturers.append(unit)
+        for unit in capturers:
           self.capture_building(unit, b)
 
       # If we have enough units at a base, send them on the
@@ -84,13 +88,26 @@ class RushAI(ai.AI):
               for unit in leave:
                 if unit in p_set:
                   p_set.remove(unit)
+              return
+
+          # If we don't look for a building, how about we send
+          # a bunch of guys to a place where the most of our
+          # explorers have died.
+          most_deaths = 0
+          most_pos = None
+          for dead_point in self.explorer_death_positions:
+            deaths = self.explorer_death_positions[dead_point]
+            if most_deaths < deaths:
+              most_deaths = deaths
+              most_pos = dead_point
+
+          if most_pos:
+            del self.explorer_death_positions[most_pos]
+            for unit in leave:
+              self.capture_position(leave, most_pos)
 
     def _unit_spawned(self, unit):
       self.sights[unit] = unit.sight
-
-      if self.current_turn == 1:
-        self.defenders[unit] = unit.position
-        return
 
       if len(self.explorers) < len(self.my_buildings) or len(self.defenders) / len(self.explorers) > EXPLORER_RATIO :
         self.explorers[unit] = True
@@ -153,21 +170,8 @@ class RushAI(ai.AI):
 
       if not unit in self.destinations or\
         unit.position == self.destinations[unit]:
-#        if self.aggressive[unit]:
-#          min_p = 1000000
-#          min_b = None
-#          for p in self.buildings:
-#            dist = unit.calcDistance(p)
-#            if min_p > dist:
-#              min_p = dist
-#              min_b = self.buildings[p]
-#
-#          if min_b:
-#            self.capture_building(unit, min_b)
-#            return
-#
+
         destination = self.next_destination(unit)
-        print destination
         if not destination:
           self.capture_building(unit,
             random.choice(self.buildings.values()))
@@ -184,10 +188,18 @@ class RushAI(ai.AI):
         unit.move(b.position)
       else:
         unit.capture(b)
-        del self.explorers[unit]
+        if unit in self.explorers: del self.explorers[unit]
         self.aggressive[unit] = False
         self.defenders[unit] = b.position
         self.positions[b.position].add(unit)
+
+    def capture_position(self, units, position):
+      for unit in units:
+        x,y = fuzz_position(position, unit.sight, self.mapsize)
+        unit.move((x,y))
+        self.aggressive[unit] = True
+        self.explorers[unit] = True
+        self.destinations[unit] = (x,y)
 
     def surround_position(self, units, position):
       for unit in units:
@@ -233,9 +245,15 @@ class RushAI(ai.AI):
     def _unit_died(self, unit):
       if unit in self.explorers:
         del self.explorers[unit]
+        self.explorer_death_positions[unit.position] += 1
 
       if unit in self.defenders:
         del self.defenders[unit]
+
+      if unit in self.destinations:
+        dest = self.destinations[unit]
+        if dest in self.visiting:
+          del self.visiting[dest]
 
       for pos in self.positions:
         if unit in self.positions[pos]:
