@@ -54,7 +54,9 @@ class LocationHistory:
         self.visit_time_positions[now].append(position)
         previous = self.position_visit_times[position]
         self.position_visit_times[position] = now
-        self.visit_time_positions[previous].remove(position)
+        if position in self.visit_time_positions[previous]:
+          self.visit_time_positions[previous].remove(position)
+
         if len(self.visit_time_positions[previous]) == 0:
           del self.visit_time_positions[previous]
 
