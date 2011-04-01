@@ -80,8 +80,9 @@ class RushAI(ai.AI):
         p_set = self.positions[pos]
         if len(p_set) >= 2*EXPLORER_RATIO:
           ordered_list = list(p_set)
-          stay = ordered_list[:EXPLORER_RATIO]
-          leave = ordered_list[EXPLORER_RATIO+1:]
+          cut_idx = int(10.0 / 16.0 * len(ordered_list))
+          stay = ordered_list[:cut_idx]
+          leave = ordered_list[cut_idx:]
           for p in self.buildings:
             if self.buildings[p] not in self.visible_buildings:
               self.surround_position(leave, p)
@@ -109,6 +110,8 @@ class RushAI(ai.AI):
     def _unit_spawned(self, unit):
       self.sights[unit] = unit.sight
 
+      if not self.explorers:
+        self.explorers[unit] = True
       if len(self.explorers) < len(self.my_buildings) or len(self.defenders) / len(self.explorers) > EXPLORER_RATIO :
         self.explorers[unit] = True
       else:
