@@ -24,7 +24,11 @@ class CircleBlaster(ai.AI):
 
       cluster_size = 5
       rotation_offset = 0
-      for i in xrange(len(available_units)/cluster_size+1):
+
+
+      main_circle_size = len(available_units)
+
+      for i in xrange(len(available_units)/cluster_size+2):
         rotation_offset += THIRTY_DEGREES
         unit_cluster = available_units[:(i+1)*cluster_size]
         available_units = available_units[(i+1)*cluster_size:]
@@ -34,23 +38,26 @@ class CircleBlaster(ai.AI):
         else:
           pos = random.choice(list(self.buildings)).position
           radius = 1
-          self.form_circle(unit_cluster, pos, radius, rotation_offset)
-          continue
-
-        # [TODO] Plug in exploration code here
-#        if len(available_units)*2 > math.sqrt(self.mapsize):
-#          pos = random.randint(0, self.mapsize), random.randint(0, self.mapsize)
-
-
-        radius = math.log(self.mapsize)*len(self.my_units) / 2
-        self.form_circle(unit_cluster, pos, radius, rotation_offset)
-
 
         for unit in unit_cluster:
           if unit.visible_enemies:
             vunit = random.choice(unit.visible_enemies)
             self.form_circle(unit_cluster, vunit.position, 3, rotation_offset)
             break
+
+        # Radius = 1/2 diameter
+        try:
+          x_pos = random.randint(0, main_circle_size/2)*unit_cluster[0].sight
+          y_pos = (main_circle_size/2) - x_pos
+
+          x_pos *= random.choice([-1, 1, 0.5, -0.5])
+          y_pos *= random.choice([-1, 1, 0.5, -0.5])
+          pos  = (x_pos+pos[0],y_pos+pos[1])
+        except:
+          pass
+
+        radius = math.log(self.mapsize)*main_circle_size / 2
+        self.form_circle(unit_cluster, pos, radius, rotation_offset)
 
       for unit in self.my_units:
         ire = unit.in_range_enemies
