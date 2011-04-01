@@ -42,6 +42,7 @@ class RushAI(ai.AI):
       self.sights = {}
       self.to_visit = set()
       self.visiting = {}
+      self.capture_attempts = defaultdict(int)
 
       self.explorer_death_positions = defaultdict(int)
       self.aggressive = defaultdict(bool)
@@ -80,7 +81,7 @@ class RushAI(ai.AI):
         p_set = self.positions[pos]
         if len(p_set) >= 2*EXPLORER_RATIO:
           ordered_list = list(p_set)
-          cut_idx = int(10.0 / 16.0 * len(ordered_list))
+          cut_idx = int(0.5 * len(ordered_list))
           stay = ordered_list[:cut_idx]
           leave = ordered_list[cut_idx:]
           for p in self.buildings:
@@ -102,10 +103,13 @@ class RushAI(ai.AI):
               most_deaths = deaths
               most_pos = dead_point
 
+
           if most_pos:
-            del self.explorer_death_positions[most_pos]
-            for unit in leave:
-              self.capture_position(leave, most_pos)
+            needed_units = 2*EXPLORER_RATIO*self.explorer_death_positions[most_pos]
+            if cut_idx > needed_units:
+              del self.explorer_death_positions[most_pos]
+              for unit in leave:
+                self.capture_position(leave, most_pos)
 
     def _unit_spawned(self, unit):
       self.sights[unit] = unit.sight
@@ -203,6 +207,7 @@ class RushAI(ai.AI):
         self.aggressive[unit] = True
         self.explorers[unit] = True
         self.destinations[unit] = (x,y)
+        self.capture_attempts[(x,y)] += 1
 
     def surround_position(self, units, position):
       for unit in units:
@@ -248,7 +253,7 @@ class RushAI(ai.AI):
     def _unit_died(self, unit):
       if unit in self.explorers:
         del self.explorers[unit]
-        self.explorer_death_positions[unit.position] += 1
+        self.explorer_death_positions[to_area(unit.position)] += 1
 
       if unit in self.defenders:
         del self.defenders[unit]
