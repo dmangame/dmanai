@@ -61,12 +61,17 @@ class CircleBlaster(ai.AI):
       radian_delta = (2*math.pi) / len(units)
       radian_offset = 0
       for unit in units:
+        attempts = 0
         while True:
           radian_offset += radian_delta
           pos_x = x+(radius*math.cos(radian_offset))
           pos_y = y+(radius*math.sin(radian_offset))
+          attempts += 1
           if isValidSquare((pos_x, pos_y), self.mapsize):
             break
+
+          if attempts >= 10:
+            return
 
         unit.move((pos_x, pos_y))
 
