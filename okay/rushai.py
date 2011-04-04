@@ -48,6 +48,8 @@ class RushAI(ai.AI):
       self.aggressive = defaultdict(bool)
       self.positions = defaultdict(set)
 
+      self.map_reductions = 0
+
       for i in xrange(self.mapsize/AREA_SIZE):
         for j in xrange(self.mapsize/AREA_SIZE):
           self.to_visit.add((i*AREA_SIZE,j*AREA_SIZE))
@@ -99,26 +101,35 @@ class RushAI(ai.AI):
           most_pos = None
           for dead_point in self.explorer_death_positions:
             deaths = self.explorer_death_positions[dead_point]
-            if most_deaths < deaths:
+            if most_deaths <= deaths and most_deaths <= len(leave):
               most_deaths = deaths
               most_pos = dead_point
 
 
           if most_pos:
-            needed_units = 2*EXPLORER_RATIO*self.explorer_death_positions[most_pos]
-            if cut_idx > needed_units:
-              del self.explorer_death_positions[most_pos]
-              for unit in leave:
-                self.capture_position(leave, most_pos)
+            del self.explorer_death_positions[most_pos]
+            self.capture_position(leave, most_pos)
 
     def _unit_spawned(self, unit):
       self.sights[unit] = unit.sight
 
-      if not self.explorers:
+      explorer = False
+      if len(self.explorers) < len(self.my_buildings):
+        explorer = True
+
+      if self.explorers and len(self.defenders) / len(self.explorers) > EXPLORER_RATIO:
+        explorer = True
+
+      if len(self.buildings) > len(self.my_buildings):
+        explorer = False
+
+      if self.map_reductions > 1:
+        explorer = False
+
+      if explorer:
         self.explorers[unit] = True
-      if len(self.explorers) < len(self.my_buildings) or len(self.defenders) / len(self.explorers) > EXPLORER_RATIO :
-        self.explorers[unit] = True
-      else:
+
+      if not explorer:
         if self.buildings:
           min_dist = 10000
           min_pos = None
@@ -140,6 +151,7 @@ class RushAI(ai.AI):
       if len(self.to_visit) < len(self.visiting):
         self.visiting.clear()
         AREA_SIZE /= 2
+        self.map_reductions += 1
         for i in xrange(self.mapsize/AREA_SIZE):
           for j in xrange(self.mapsize/AREA_SIZE):
             self.to_visit.add((i*AREA_SIZE,j*AREA_SIZE))

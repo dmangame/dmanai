@@ -33,6 +33,7 @@ class CircleBlaster(ai.AI):
         unit_cluster = available_units[:(i+1)*cluster_size]
         available_units = available_units[(i+1)*cluster_size:]
 
+        radius = math.log(self.mapsize)*main_circle_size / 2
         if self.my_buildings:
           pos = random.choice(self.my_buildings).position
         else:
@@ -56,7 +57,6 @@ class CircleBlaster(ai.AI):
         except:
           pass
 
-        radius = math.log(self.mapsize)*main_circle_size / 2
         self.form_circle(unit_cluster, pos, radius, rotation_offset)
 
       for unit in self.my_units:
