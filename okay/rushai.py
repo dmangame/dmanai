@@ -11,8 +11,8 @@ EXPLORER_RATIO=4
 AREA_SIZE = 8
 
 def fuzz_position((x, y), sight, mapsize):
-  dx = int((sight - random.randint(0, 3)) * random.choice([-1, 1]))
-  dy = int((sight - random.randint(0, 3)) * random.choice([-1, 1]))
+  dx = int((sight) * random.choice([-1, 1]))
+  dy = int((sight) * random.choice([-1, 1]))
 
   ox,oy = x,y
   x += dx
@@ -36,6 +36,7 @@ class RushAI(ai.AI):
       AREA_SIZE = self.mapsize / 12
 
       self.buildings = {}
+      self.capturers = {}
       self.defenders = {}
       self.destinations = {}
       self.explorers = {}
@@ -88,7 +89,7 @@ class RushAI(ai.AI):
           leave = ordered_list[cut_idx:]
           for p in self.buildings:
             if self.buildings[p] not in self.visible_buildings:
-              self.surround_position(leave, p)
+              self.capture_position(leave, p)
               for unit in leave:
                 if unit in p_set:
                   p_set.remove(unit)
@@ -190,15 +191,20 @@ class RushAI(ai.AI):
       if not unit in self.destinations or\
         unit.position == self.destinations[unit]:
 
-        destination = self.next_destination(unit)
-        if not destination:
-          self.capture_building(unit,
-            random.choice(self.buildings.values()))
-          self.aggressive[unit] = True
-          return
-        else:
+        if unit in self.capturers:
+          destination = self.capturers[unit]
           self.destinations[unit] = destination
-          self.visiting[destination] = unit
+          del self.capturers[unit]
+        else:
+          destination = self.next_destination(unit)
+          if not destination:
+            self.capture_building(unit,
+              random.choice(self.buildings.values()))
+            self.aggressive[unit] = True
+            return
+          else:
+            self.destinations[unit] = destination
+            self.visiting[destination] = unit
 
       unit.move(self.destinations[unit])
 
@@ -214,16 +220,17 @@ class RushAI(ai.AI):
 
     def capture_position(self, units, position):
       for unit in units:
-        x,y = fuzz_position(position, unit.sight, self.mapsize)
+        x,y = fuzz_position(position, unit.sight*2, self.mapsize)
         unit.move((x,y))
         self.aggressive[unit] = True
         self.explorers[unit] = True
         self.destinations[unit] = (x,y)
+        self.capturers[unit] = position
         self.capture_attempts[(x,y)] += 1
 
     def surround_position(self, units, position):
       for unit in units:
-        x,y = fuzz_position(position, unit.sight, self.mapsize)
+        x,y = fuzz_position(position, unit.sight*2, self.mapsize)
         unit.move((x,y))
         self.aggressive[unit] = True
         self.defenders[unit] = position
@@ -266,6 +273,9 @@ class RushAI(ai.AI):
       if unit in self.explorers:
         del self.explorers[unit]
         self.explorer_death_positions[to_area(unit.position)] += 1
+
+      if unit in self.capturers:
+        del self.capturers[unit]
 
       if unit in self.defenders:
         del self.defenders[unit]
