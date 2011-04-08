@@ -148,7 +148,7 @@ class GooseAI(ai.AI):
       if len(s) == 0:
         to_remove.append(s)
 
-    for x in to_remove:
+    for s in to_remove:
       self.squads.remove(s)
 
 
