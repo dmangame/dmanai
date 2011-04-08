@@ -5,10 +5,28 @@ import ai_exceptions
 import logging
 from collections import defaultdict
 log = logging.getLogger(AIClass)
+from world import isValidSquare
 
 AREA_SIZE = 16
+def fuzz_position((x, y), sight, mapsize):
+  dx = int((sight) * random.choice([-1, 1]))
+  dy = int((sight) * random.choice([-1, 1]))
+
+  ox,oy = x,y
+  x += dx
+  y += dy
+  attempts = 30
+  while not isValidSquare((x,y), mapsize) and attempts > 0:
+    x,y = ox,oy
+    dx = int((sight - random.randint(0, 3)) * random.choice([-1, 1]))
+    dy = abs(sight - abs(dx)) * random.choice([-1, 1])
+    x += dx
+    y += dy
+    attempts -= 1
+  return x,y
+
 class V:
-  def __init__(self, left=None, center=None, right=None, base=None):
+  def __init__(self, left=None, center=None, right=None, base=None, mapsize=None):
     self.l = left
     self.c = center
     self.r = right
@@ -17,6 +35,7 @@ class V:
     self.position_offsets = [(-5,-5), (0,0), (-5,5)]
     self.destination = base
     self.guarding = None
+    self.mapsize = mapsize
 
   def __len__(self):
     l = 0
@@ -131,7 +150,14 @@ class V:
     return len(self) == len(self.positions)
 
   def guard(self, building):
-    self.destination = building.position
+    for p in self.positions:
+      unit = getattr(self, p)
+      if unit:
+        sight = unit.sight
+        if sight:
+          break
+
+    self.destination = fuzz_position(building.position, sight, self.mapsize)
     self.guarding = building
     self.base = building.position
 
@@ -157,7 +183,7 @@ class GooseAI(ai.AI):
         s.add_unit(unit)
         return
 
-    self.squads.append(V(left=unit, base=unit.position))
+    self.squads.append(V(left=unit, base=unit.position, mapsize=self.mapsize))
 
   def _unit_died(self, unit):
     to_remove = []
@@ -193,17 +219,23 @@ class GooseAI(ai.AI):
         i+=1
 
 
-    for b in self.buildings.difference(my_buildings):
-      if i >= len(self.squads):
-        break
-      s = self.squads[i]
-      if s.full_squad:
-        self.squads[i].capture_building(b)
-        i += 1
-      else:
-        break
+    # Will send all squads to capture.
+    capture_buildings = self.buildings.difference(my_buildings)
+    if capture_buildings:
+      available_units = len(self.squads) - i
+      squad_per_b = available_units / len(capture_buildings)
+      for b in capture_buildings:
+        if i >= len(self.squads):
+          break
+        squad_per_b
+        deploy = self.squads[i:i+squad_per_b]
+        i += squad_per_b
+        for s in deploy:
+          if s.full_squad:
+            s.capture_building(b)
+          else:
+            break
 
-    # Leave one unit at the base
     for s in self.squads[i:]:
       if not s.is_moving:
         # Go visit a new position
