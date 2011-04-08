@@ -100,7 +100,9 @@ class V:
     if all_attack:
       for p in self.positions:
         unit = getattr(self, p)
-        if unit and all_attack in unit.in_range_enemies:
+        if not unit: continue
+
+        if all_attack in unit.in_range_enemies:
           unit.shoot(all_attack.position)
         else:
           unit.move(all_attack.position)
