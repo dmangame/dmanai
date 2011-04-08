@@ -3,8 +3,10 @@ AIClass="GooseAI"
 import random
 import ai_exceptions
 import logging
+from collections import defaultdict
 log = logging.getLogger(AIClass)
 
+AREA_SIZE = 16
 class V:
   def __init__(self, left=None, center=None, right=None, base=None):
     self.l = left
@@ -14,6 +16,7 @@ class V:
     self.positions = ["l", "c", "r"]
     self.position_offsets = [(-5,-5), (0,0), (-5,5)]
     self.destination = base
+    self.guarding = None
 
   def __len__(self):
     l = 0
@@ -121,17 +124,32 @@ class V:
       self.destination = self.base
 
     self.units_in_place()
-    if self.full_squad():
-      self.capture_buildings()
+    self.capture_buildings()
     self.attack_nearby_enemies()
 
   def full_squad(self):
     return len(self) == len(self.positions)
 
+  def guard(self, building):
+    self.destination = building.position
+    self.guarding = building
+    self.base = building.position
+
+def to_area_square((x,y)):
+  return (x/AREA_SIZE*AREA_SIZE, y/AREA_SIZE*AREA_SIZE)
+
 class GooseAI(ai.AI):
   def _init(self):
     self.squads = []
     self.buildings = set()
+    self.to_visit = []
+
+
+  def generate_to_visit(self):
+    areas = self.mapsize / AREA_SIZE
+    for x in xrange(areas):
+      for y in xrange(areas):
+        self.to_visit.append((x*AREA_SIZE,y*AREA_SIZE))
 
   def _unit_spawned(self, unit):
     for s in self.squads:
@@ -159,7 +177,25 @@ class GooseAI(ai.AI):
     if not self.squads:
       return
 
+    guarding = []
+    buildings_covered = defaultdict(bool)
+    for s in self.squads:
+      if s.guarding:
+        buildings_covered[s] = s.guarding
+        guarding.append(s)
+
+    for b in self.my_buildings:
+      if i >= len(self.squads):
+        break
+      if not buildings_covered[b]:
+        s = self.squads[i]
+        s.guard(b)
+        i+=1
+
+
     for b in self.buildings.difference(my_buildings):
+      if i >= len(self.squads):
+        break
       s = self.squads[i]
       if s.full_squad:
         self.squads[i].capture_building(b)
@@ -167,13 +203,21 @@ class GooseAI(ai.AI):
       else:
         break
 
-      if i >= len(self.squads):
-        break
-
     # Leave one unit at the base
     for s in self.squads[i:]:
       if not s.is_moving:
-        s.move_to((random.randint(0, self.mapsize), random.randint(0, self.mapsize)))
+        # Go visit a new position
+        old_pos = to_area_square(s.destination)
+        if old_pos in self.to_visit:
+          self.to_visit.remove(old_pos)
+
+        if not self.to_visit:
+          global AREA_SIZE
+          AREA_SIZE /= 2
+          self.generate_to_visit()
+        dest = random.choice(self.to_visit)
+
+        s.move_to(dest)
 
     for s in self.squads:
       s.spin()
