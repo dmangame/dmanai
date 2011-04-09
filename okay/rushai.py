@@ -102,12 +102,11 @@ class RushAI(ai.AI):
           most_pos = None
           for dead_point in self.explorer_death_positions:
             deaths = self.explorer_death_positions[dead_point]
-            if most_deaths <= deaths and most_deaths <= len(leave):
+            if most_deaths <= deaths:
               most_deaths = deaths
               most_pos = dead_point
 
-
-          if most_pos:
+          if most_pos and len(leave) > most_deaths:
             del self.explorer_death_positions[most_pos]
             self.capture_position(leave, most_pos)
 

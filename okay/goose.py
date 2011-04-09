@@ -7,7 +7,6 @@ from collections import defaultdict
 log = logging.getLogger(AIClass)
 from world import isValidSquare
 
-AREA_SIZE = 16
 def fuzz_position((x, y), sight, mapsize):
   dx = int((sight) * random.choice([-1, 1]))
   dy = int((sight) * random.choice([-1, 1]))
@@ -161,21 +160,24 @@ class V:
     self.guarding = building
     self.base = building.position
 
-def to_area_square((x,y)):
-  return (x/AREA_SIZE*AREA_SIZE, y/AREA_SIZE*AREA_SIZE)
-
 class GooseAI(ai.AI):
   def _init(self):
+    self.areas = 8
     self.squads = []
     self.buildings = set()
     self.to_visit = []
 
 
+  def to_area_square(self, (x,y)):
+    area_size = self.mapsize / self.areas
+    return (x/area_size*area_size, y/area_size*area_size)
+
   def generate_to_visit(self):
-    areas = self.mapsize / AREA_SIZE
-    for x in xrange(areas):
-      for y in xrange(areas):
-        self.to_visit.append((x*AREA_SIZE,y*AREA_SIZE))
+    areas = self.areas
+    area_size = self.mapsize / self.areas
+    for x in xrange(areas+1):
+      for y in xrange(areas+1):
+        self.to_visit.append((x*area_size,y*area_size))
 
   def _unit_spawned(self, unit):
     for s in self.squads:
@@ -236,18 +238,17 @@ class GooseAI(ai.AI):
           else:
             break
 
+    if not self.to_visit:
+      self.areas *= int(1.5)
+      self.generate_to_visit()
+
+    dest = random.choice(self.to_visit)
     for s in self.squads[i:]:
       if not s.is_moving:
         # Go visit a new position
-        old_pos = to_area_square(s.destination)
+        old_pos = self.to_area_square(s.destination)
         if old_pos in self.to_visit:
           self.to_visit.remove(old_pos)
-
-        if not self.to_visit:
-          global AREA_SIZE
-          AREA_SIZE /= 2
-          self.generate_to_visit()
-        dest = random.choice(self.to_visit)
 
         s.move_to(dest)
 
