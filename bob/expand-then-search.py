@@ -16,6 +16,7 @@ class LocationHistory:
       self.duplicated = {}
 
     def get_least_recently_visited_area(self, my_location, exclude):
+      exclude = set(exclude)
       visit_times = sorted(self.visit_time_positions.keys())
       min_distance = float('inf')
       min_location = my_location #stay put if everything is already excluded, we probably won
