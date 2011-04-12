@@ -18,11 +18,9 @@ class RushAI(okay.OkayAI):
 
       self.capturers = {}
       self.defenders = {}
-      self.explorers = {}
       self.sights = {}
       self.capture_attempts = defaultdict(int)
 
-      self.explorer_death_positions = defaultdict(int)
       self.aggressive = defaultdict(bool)
       self.positions = defaultdict(set)
 
@@ -208,10 +206,6 @@ class RushAI(okay.OkayAI):
 
 
     def _unit_died(self, unit):
-      if unit in self.explorers:
-        del self.explorers[unit]
-        self.explorer_death_positions[self.searcher.to_area(unit.position)] += 1
-
       if unit in self.capturers:
         del self.capturers[unit]
 

@@ -16,8 +16,7 @@ THIRTY_DEGREES=(180 / math.pi) * 30
 
 class CircleBlaster(okay.OkayAI):
     def _init(self):
-      self.cluster_destination = None
-      self.explorers = []
+      self.cluster_size = 5
       self.expansion_phase = 0
 
     def _spin(self):
@@ -28,7 +27,6 @@ class CircleBlaster(okay.OkayAI):
       for building in self.visible_buildings:
         self.buildings[building.position] = building
 
-      cluster_size = 5
       rotation_offset = 0
 
 
@@ -38,27 +36,36 @@ class CircleBlaster(okay.OkayAI):
       radius_m = 1
       if self.expansion_phase:
         self.expansion_phase -= 1
-        radius_m = 10
+        radius_m = random.randint(5, 15)
       else:
         if len(self.my_units) > 10 and random.random() > 0.95:
           self.expansion_phase = random.randint(5, 10)
 
       if self.explorers:
+        is_moving = False
         for unit in self.explorers:
-          self.searcher.assign_next_destination(unit)
-          unit.move(self.searcher.destinations[unit])
-          available_units.remove(unit)
+          if unit.is_moving:
+            is_moving = True
+            break
 
-      for i in xrange(len(available_units)/cluster_size+2):
+        if not is_moving:
+          unit = self.explorers.keys()[0]
+          self.searcher.assign_next_destination(unit)
+
+          self.form_circle(self.explorers, self.searcher.destinations[unit], main_circle_size)
+
+        for cunit in self.explorers:
+          available_units.remove(cunit)
+
+
+      for i in xrange(len(available_units)/self.cluster_size+2):
         rotation_offset += THIRTY_DEGREES
-        unit_cluster = available_units[:(i+1)*cluster_size]
-        available_units = available_units[(i+1)*cluster_size:]
+        unit_cluster = available_units[:(i+1)*self.cluster_size]
+        available_units = available_units[(i+1)*self.cluster_size:]
 
         radius = math.log(self.mapsize)*main_circle_size / 2
-        if self.my_buildings:
-          pos = random.choice(self.my_buildings).position
-        else:
-          pos = random.choice(self.buildings.keys()).position
+        pos = random.choice(self.buildings.keys())
+        if not self.my_buildings:
           radius = 1
 
         for unit in unit_cluster:
@@ -108,42 +115,7 @@ class CircleBlaster(okay.OkayAI):
             else:
               unit.move(b.position)
 
-
-
-
-    def form_circle(self, units, (x,y), radius, ro=0):
-      if not units:
-        return
-
-      # So, use radians (2pi form a circle)
-      radian_delta = (2*math.pi) / len(units)
-      radian_offset = ro
-      for unit in units:
-        attempts = 0
-        while True:
-          radian_offset += radian_delta
-          pos_x = x+(radius*math.cos(radian_offset))
-          pos_y = y+(radius*math.sin(radian_offset))
-          pos_x = max(min(self.mapsize, pos_x), 0)
-          pos_y = max(min(self.mapsize, pos_y), 0)
-          attempts += 1
-          if isValidSquare((pos_x, pos_y), self.mapsize):
-            break
-
-          if attempts >= 3:
-            return
-
-        unit.move((pos_x, pos_y))
-
-    def collapse_circle(self, units, (x,y)):
-      # So, use radians (2pi form a circle)
-      for unit in units:
-        unit.move((x, y))
-
-    def _unit_died(self, unit):
-      if unit in self.explorers:
-        self.explorers.remove(unit)
-
     def _unit_spawned(self, unit):
-      if not self.explorers or len(self.my_units) / len(self.explorers) >= 4:
-        self.explorers.append(unit)
+      if not self.explorers or len(self.my_units) / len(self.explorers) >= self.cluster_size:
+        self.explorers[unit] = True
+        self.form_circle(self.explorers, unit.position, 5)

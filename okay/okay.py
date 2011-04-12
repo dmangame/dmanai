@@ -3,6 +3,8 @@ import unit
 from collections import defaultdict
 
 import random
+import math
+
 from world import isValidSquare
 
 class NearbySearcher():
@@ -16,11 +18,15 @@ class NearbySearcher():
     self.mapsize = mapsize
 
 
-  def to_area(self, (x,y)):
-     x = x/self.AREA_SIZE*self.AREA_SIZE
-     y = y/self.AREA_SIZE*self.AREA_SIZE
+  def to_area(self, (x,y),area_size=None):
+   
+    if not area_size:
+      area_size = self.AREA_SIZE
 
-     return min(self.mapsize,max(0, x)), min(self.mapsize,max(0, y))
+    x = x/area_size*area_size
+    y = y/area_size*area_size
+
+    return min(self.mapsize,max(0, x)), min(self.mapsize,max(0, y))
 
   def assign_next_destination(self, unit, no_destination_cb=None, arrived_cb=None):
     if unit in self.destinations:
@@ -43,6 +49,8 @@ class NearbySearcher():
     if destination:
       self.destinations[unit] = destination
       self.visiting[destination] = unit
+
+    return destination
 
   def next_destination(self, unit):
     if len(self.to_visit) <= len(self.visiting):
@@ -83,6 +91,10 @@ class OkayAI(ai.AI):
     ai.AI.init(self)
     self.buildings = {}
     self.searcher = NearbySearcher(self.mapsize)
+    self.explorers = {}
+
+    # Histogram of where our explorers die
+    self.explorer_death_positions = defaultdict(int)
 
   def turn(self, *args, **kwargs):
     for building in self.visible_buildings:
@@ -96,6 +108,10 @@ class OkayAI(ai.AI):
         if dest in self.searcher.visiting:
           del self.searcher.visiting[dest]
         del self.searcher.destinations[unit]
+
+      if unit in self.explorers:
+        del self.explorers[unit]
+        self.explorer_death_positions[self.searcher.to_area(unit.position)] += 1
 
     ai.AI.turn(self, *args, **kwargs)
     self.searcher.account_for(self.my_units)
@@ -120,3 +136,34 @@ class OkayAI(ai.AI):
       y += dy
       attempts -= 1
     return x,y
+
+
+  def form_circle(self, units, (x,y), radius, ro=0):
+    if not units:
+      return
+
+    # So, use radians (2pi form a circle)
+    radian_delta = (2*math.pi) / len(units)
+    radian_offset = ro
+    for unit in units:
+      attempts = 0
+      while True:
+        radian_offset += radian_delta
+        pos_x = x+(radius*math.cos(radian_offset))
+        pos_y = y+(radius*math.sin(radian_offset))
+        pos_x = max(min(self.mapsize, pos_x), 0)
+        pos_y = max(min(self.mapsize, pos_y), 0)
+        attempts += 1
+        if isValidSquare((pos_x, pos_y), self.mapsize):
+          break
+
+        if attempts >= 3:
+          return
+
+      self.searcher.destinations[unit] = (pos_x, pos_y)
+      unit.move((pos_x, pos_y))
+
+  def collapse_circle(self, units, (x,y)): # So, use radians (2pi form a circle)
+    for unit in units:
+      unit.move((x, y))
+
