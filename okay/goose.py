@@ -5,24 +5,11 @@ import ai_exceptions
 import logging
 from collections import defaultdict
 log = logging.getLogger(AIClass)
-from world import isValidSquare
 
-def fuzz_position((x, y), sight, mapsize):
-  dx = int((sight) * random.choice([-1, 1]))
-  dy = int((sight) * random.choice([-1, 1]))
-
-  ox,oy = x,y
-  x += dx
-  y += dy
-  attempts = 30
-  while not isValidSquare((x,y), mapsize) and attempts > 0:
-    x,y = ox,oy
-    dx = int((sight - random.randint(0, 3)) * random.choice([-1, 1]))
-    dy = abs(sight - abs(dx)) * random.choice([-1, 1])
-    x += dx
-    y += dy
-    attempts -= 1
-  return x,y
+import sys
+import os
+sys.path.append(os.path.dirname(__file__))
+import okay
 
 class V:
   def __init__(self, left=None, center=None, right=None, base=None, mapsize=None):
@@ -148,7 +135,7 @@ class V:
   def full_squad(self):
     return len(self) == len(self.positions)
 
-  def guard(self, building):
+  def guard(self, building, fuzzer):
     for p in self.positions:
       unit = getattr(self, p)
       if unit:
@@ -156,28 +143,34 @@ class V:
         if sight:
           break
 
-    self.destination = fuzz_position(building.position, sight, self.mapsize)
+    self.destination = fuzzer(building.position, sight)
     self.guarding = building
     self.base = building.position
 
-class GooseAI(ai.AI):
+  def calcDistance(self, end_square):
+    total_dist = 0.0
+    total_units = 0
+    for pos in self.positions:
+      unit = getattr(self, pos)
+      if unit:
+        total_dist = unit.calcDistance(end_square)
+        total_units += 1
+
+    if not total_units:
+      return self.mapsize ** 2
+    return total_dist / total_units
+
+class GooseAI(okay.OkayAI):
   def _init(self):
     self.areas = 8
     self.squads = []
     self.buildings = set()
-    self.to_visit = []
 
 
   def to_area_square(self, (x,y)):
     area_size = self.mapsize / self.areas
     return (x/area_size*area_size, y/area_size*area_size)
 
-  def generate_to_visit(self):
-    areas = self.areas
-    area_size = self.mapsize / self.areas
-    for x in xrange(areas+1):
-      for y in xrange(areas+1):
-        self.to_visit.append((x*area_size,y*area_size))
 
   def _unit_spawned(self, unit):
     for s in self.squads:
@@ -199,7 +192,6 @@ class GooseAI(ai.AI):
 
 
   def _spin(self):
-    self.buildings.update(set(self.visible_buildings))
     my_buildings = set(self.my_buildings)
     i = 0
     if not self.squads:
@@ -212,17 +204,17 @@ class GooseAI(ai.AI):
         buildings_covered[s] = s.guarding
         guarding.append(s)
 
-    for b in self.my_buildings:
+    for b in my_buildings:
       if i >= len(self.squads):
         break
       if not buildings_covered[b]:
         s = self.squads[i]
-        s.guard(b)
+        s.guard(b, self.fuzz_position)
         i+=1
 
 
     # Will send all squads to capture.
-    capture_buildings = self.buildings.difference(my_buildings)
+    capture_buildings = set(self.buildings.values()) - my_buildings
     if capture_buildings:
       available_units = len(self.squads) - i
       squad_per_b = available_units / len(capture_buildings)
@@ -238,19 +230,16 @@ class GooseAI(ai.AI):
           else:
             break
 
-    if not self.to_visit:
-      self.areas *= int(1.5)
-      self.generate_to_visit()
 
-    dest = random.choice(self.to_visit)
     for s in self.squads[i:]:
       if not s.is_moving:
-        # Go visit a new position
-        old_pos = self.to_area_square(s.destination)
-        if old_pos in self.to_visit:
-          self.to_visit.remove(old_pos)
+        # Pick closest point for unit to visit
+        destination = self.searcher.next_destination(s)
+        self.searcher.destinations[s] = destination
+        self.searcher.visiting[destination] = s
 
-        s.move_to(dest)
+        # Go visit a new position
+        s.move_to(self.searcher.destinations[s])
 
     for s in self.squads:
       s.spin()

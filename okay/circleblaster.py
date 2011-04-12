@@ -14,10 +14,13 @@ class CircleBlaster(ai.AI):
     def _init(self):
       self.cluster_destination = None
       self.buildings = set()
+      self.explorers = []
+      self.expansion_phase = 0
 
     def _spin(self):
       # Want functions to move the units as a whole.
       available_units = filter(lambda x: not x.is_capturing, self.my_units)
+
 
       for building in self.visible_buildings:
         self.buildings.add(building)
@@ -27,6 +30,35 @@ class CircleBlaster(ai.AI):
 
 
       main_circle_size = len(available_units)
+
+
+      radius_m = 1
+      if self.expansion_phase:
+        self.expansion_phase -= 1
+        radius_m = 10
+      else:
+        if len(self.my_units) > 10 and random.random() > 0.95:
+          self.expansion_phase = random.randint(5, 10)
+
+      if self.explorers:
+        # pick a random spot on the map
+        x,y = random.randint(0, self.mapsize), random.randint(0, self.mapsize)
+        origin = random.choice(list(self.buildings)).position
+        dx = x - origin[0]
+        dy = y - origin[1]
+
+
+        for unit in self.explorers:
+          if unit.is_moving:
+            continue
+
+          x += dx
+          y += dy
+          x = min(self.mapsize, x)
+          y = min(self.mapsize, y)
+          y = max(0, y)
+          x = max(0, x)
+          unit.move((x,y))
 
       for i in xrange(len(available_units)/cluster_size+2):
         rotation_offset += THIRTY_DEGREES
@@ -57,7 +89,7 @@ class CircleBlaster(ai.AI):
         except:
           pass
 
-        self.form_circle(unit_cluster, pos, radius, rotation_offset)
+        self.form_circle(unit_cluster, pos, radius*radius_m, rotation_offset)
 
       for unit in self.my_units:
         ire = unit.in_range_enemies
@@ -102,6 +134,8 @@ class CircleBlaster(ai.AI):
           radian_offset += radian_delta
           pos_x = x+(radius*math.cos(radian_offset))
           pos_y = y+(radius*math.sin(radian_offset))
+          pos_x = max(min(self.mapsize, pos_x), 0)
+          pos_y = max(min(self.mapsize, pos_y), 0)
           attempts += 1
           if isValidSquare((pos_x, pos_y), self.mapsize):
             break
@@ -117,7 +151,9 @@ class CircleBlaster(ai.AI):
         unit.move((x, y))
 
     def _unit_died(self, unit):
-      pass
+      if unit in self.explorers:
+        self.explorers.remove(unit)
 
     def _unit_spawned(self, unit):
-      pass
+      if not self.explorers or len(self.my_units) / len(self.explorers) >= 4:
+        self.explorers.append(unit)
