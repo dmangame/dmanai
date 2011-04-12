@@ -18,21 +18,15 @@ class CircleBlaster(okay.OkayAI):
     def _init(self):
       self.cluster_size = 5
       self.expansion_phase = 0
+      self.squads = []
+      self.radian_offset = 0
+      self.explorer = okay.CircleSquad(mapsize=self.mapsize)
 
     def _spin(self):
-      # Want functions to move the units as a whole.
       available_units = filter(lambda x: not x.is_capturing, self.my_units)
+      main_circle_size = len(available_units) - len(self.explorer)
 
-
-      for building in self.visible_buildings:
-        self.buildings[building.position] = building
-
-      rotation_offset = 0
-
-
-      main_circle_size = len(available_units) - len(self.explorers)
-
-
+      radius = math.log(self.mapsize)*main_circle_size / 2
       radius_m = 1
       if self.expansion_phase:
         self.expansion_phase -= 1
@@ -41,81 +35,65 @@ class CircleBlaster(okay.OkayAI):
         if len(self.my_units) > 10 and random.random() > 0.95:
           self.expansion_phase = random.randint(5, 10)
 
-      if self.explorers:
-        is_moving = False
-        for unit in self.explorers:
-          if unit.is_moving:
-            is_moving = True
-            break
+      for s in self.squads:
+        pos = s.base
 
-        if not is_moving:
-          unit = self.explorers.keys()[0]
-          self.searcher.assign_next_destination(unit)
-
-          self.form_circle(self.explorers, self.searcher.destinations[unit], main_circle_size)
-
-        for cunit in self.explorers:
-          available_units.remove(cunit)
-
-
-      for i in xrange(len(available_units)/self.cluster_size+2):
-        rotation_offset += THIRTY_DEGREES
-        unit_cluster = available_units[:(i+1)*self.cluster_size]
-        available_units = available_units[(i+1)*self.cluster_size:]
-
-        radius = math.log(self.mapsize)*main_circle_size / 2
-        pos = random.choice(self.buildings.keys())
         if not self.my_buildings:
           radius = 1
 
-        for unit in unit_cluster:
-          if unit.visible_enemies:
-            vunit = random.choice(unit.visible_enemies)
-            self.form_circle(unit_cluster, vunit.position, 3, rotation_offset)
-            break
-
         # Radius = 1/2 diameter
-        try:
-          x_pos = random.randint(0, main_circle_size/2)*unit_cluster[0].sight
-          y_pos = (main_circle_size/2) - x_pos
+        x_pos = random.randint(0, main_circle_size/2)*s.sight
+        y_pos = (main_circle_size/2) - x_pos
 
-          x_pos *= random.choice([-1, 1, 0.5, -0.5])
-          y_pos *= random.choice([-1, 1, 0.5, -0.5])
-          pos  = (x_pos+pos[0],y_pos+pos[1])
-        except:
-          pass
+        x_pos *= random.choice([-1, 1, 0.5, -0.5])
+        y_pos *= random.choice([-1, 1, 0.5, -0.5])
+        pos  = [x_pos+pos[0],y_pos+pos[1]]
+        pos[0] = min(max(0, pos[0]), self.mapsize)
+        pos[1] = min(max(0, pos[1]), self.mapsize)
 
-        self.form_circle(unit_cluster, pos, radius*radius_m, rotation_offset)
 
-      for unit in self.my_units:
-        ire = unit.in_range_enemies
-        hit = False
-        for vunit in ire:
-          ff = False
-          hits = unit.calcVictims(vunit.position)
-          for hit in hits:
-            if hit.team == self.team:
-              ff = True
-              break
+        s.radius = radius * radius_m
+        s.destination = pos
+        s.spin()
 
-          if not ff:
-            hit = True
-            unit.shoot(vunit.position)
-            break
+      # Send the explorer around
 
-        if not hit and ire:
-          unit.shoot(ire[0].position)
+      if not self.explorer.is_moving:
+        destination = self.searcher.next_destination(self.explorer)
+        self.searcher.destinations[self.explorer] = destination
+        self.searcher.visiting[destination] = self.explorer
+        self.explorer.destination = destination
+      self.explorer.radius = self.explorer.sight*len(self.explorer) / 4
+      self.explorer.spin()
 
-        vb = unit.visible_buildings
-        if vb:
-          b = vb[0]
-          if unit.team != b.team:
-            if b.position == unit.position:
-              unit.capture(b)
-            else:
-              unit.move(b.position)
 
     def _unit_spawned(self, unit):
-      if not self.explorers or len(self.my_units) / len(self.explorers) >= self.cluster_size:
-        self.explorers[unit] = True
-        self.form_circle(self.explorers, unit.position, 5)
+      if len(self.explorer) == 0 or len(self.my_units) / len(self.explorer) >= self.cluster_size:
+        self.explorer.add_unit(unit)
+        self.explorer.destination = unit.position
+        self.explorer.base = unit.position
+        return
+
+      for s in self.squads:
+        if len(s) < self.cluster_size:
+          s.add_unit(unit)
+          return
+
+
+      s = okay.CircleSquad(base=unit.position, mapsize=self.mapsize)
+      self.squads.append(s)
+      s.add_unit(unit)
+      s.radian_offset = random.randint(1, 5)*THIRTY_DEGREES
+
+    def _unit_died(self, unit):
+      to_remove = []
+      for s in self.squads:
+        s.remove_unit(unit)
+        if len(s) == 0:
+          to_remove.append(s)
+
+      self.explorer.remove_unit(unit)
+
+      for s in to_remove:
+        self.squads.remove(s)
+

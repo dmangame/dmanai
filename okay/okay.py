@@ -1,5 +1,6 @@
 import ai
 import unit
+import ai_exceptions
 from collections import defaultdict
 
 import random
@@ -178,3 +179,217 @@ class OkayAI(ai.AI):
     for unit in units:
       unit.move((x, y))
 
+# A group of units that act as one. Sort of.
+class Squad(object):
+  def __init__(self, *args, **kwargs):
+    self.destination = kwargs.get("base", None)
+    self.mapsize = kwargs.get("mapsize", None)
+
+    self.base = self.destination
+    self.guarding = None
+
+    self.positions = ["l", "r"]
+
+  @property
+  def position_offsets(self):
+    return [(-2, 0), (2, 0)]
+
+  def __len__(self):
+    l = 0
+    for p in self.positions:
+      if getattr(self, p):
+        l += 1
+    return l
+
+  @property
+  def is_moving(self, at_least=1):
+    count = 0
+    for p in self.positions:
+      unit = getattr(self, p)
+      if not unit:
+        continue
+      if unit.is_alive and unit.is_moving:
+        count += 1
+
+    return at_least <= count
+
+  @property
+  def units(self):
+    units = []
+    for p in self.positions:
+      unit = getattr(self, p)
+      if unit:
+        units.append(unit)
+    return units
+
+
+  @property
+  def sight(self):
+    return sum(map(lambda x: x.sight, self.units)) / len(self)
+
+  def units_in_place(self):
+    for i in xrange(len(self.positions)):
+      p = self.positions[i]
+      unit = getattr(self, p)
+
+      if unit and not unit.is_capturing:
+        pos = self.destination or self.base
+        off = self.position_offsets[i]
+        dest = (pos[0] + off[0], pos[1]+off[1])
+        if dest != unit.position:
+          try:
+            unit.move(dest)
+          except ai_exceptions.IllegalSquareException:
+            unit.move(self.destination)
+          except ai_exceptions.DeadUnitException:
+            print "Tried using a dead unit"
+            raise
+            self.remove_unit(unit)
+
+  def add_unit(self, unit):
+    for i in xrange(len(self.positions)):
+      p = self.positions[i]
+      if not getattr(self, p):
+        setattr(self, p, unit)
+        return
+
+
+
+    attr = "u%s"%(unit.unit_id)
+    self.positions.append(attr)
+    setattr(self, attr, unit)
+
+
+  def capture_buildings(self):
+    for p in self.positions:
+      unit = getattr(self, p)
+      if unit:
+        vb = unit.visible_buildings
+        if vb:
+          for b in vb:
+            if b.team != unit.team:
+              self.capture_building(b)
+              return
+
+  def capture_building(self, b):
+    pos = b.position
+    self.destination = pos
+    for p in self.positions:
+      unit = getattr(self, p)
+      if unit:
+        if unit.position == pos:
+          unit.capture(b)
+          return
+        else:
+          unit.move(pos)
+
+  def attack_nearby_enemies(self):
+    all_attack = None
+    for p in self.positions:
+      unit = getattr(self, p)
+      if unit:
+        ire = unit.in_range_enemies
+        if ire:
+          all_attack = ire[0]
+          break
+
+    if all_attack:
+      for p in self.positions:
+        unit = getattr(self, p)
+        if not unit: continue
+
+        if all_attack in unit.in_range_enemies:
+          unit.shoot(all_attack.position)
+        else:
+          unit.move(all_attack.position)
+
+  def remove_unit(self, unit):
+    for p in self.positions:
+      if getattr(self, p) == unit:
+        setattr(self, p, None)
+        return
+
+    attr = "u%s"%(unit.unit_id)
+    if attr in self.positions:
+      self.positions.remove(attr)
+
+  def move_to(self, position):
+    self.destination = position
+
+  def spin(self):
+    if len(self) < 3:
+      self.destination = self.base
+
+    self.units_in_place()
+    self.capture_buildings()
+    self.attack_nearby_enemies()
+
+  def full_squad(self):
+    return len(self) == len(self.positions)
+
+  def guard(self, building, fuzzer):
+    for p in self.positions:
+      unit = getattr(self, p)
+      if unit:
+        sight = unit.sight
+        if sight:
+          break
+
+    self.destination = fuzzer(building.position, sight)
+    self.guarding = building
+    self.base = building.position
+
+
+  def calcDistance(self, end_square):
+    total_dist = 0.0
+    total_units = 0
+    for pos in self.positions:
+      unit = getattr(self, pos)
+      if unit:
+        total_dist = unit.calcDistance(end_square)
+        total_units += 1
+
+    if not total_units:
+      return self.mapsize ** 2
+    return total_dist / total_units
+
+class V(Squad):
+  def __init__(self, *args, **kwargs):
+    Squad.__init__(self, *args, **kwargs)
+
+    self.l = kwargs.get("left", None)
+    self.c = kwargs.get("center", None)
+    self.r = kwargs.get("right", None)
+    self.positions = ["l", "c", "r"]
+    self.position_offsets = [(-5,-5), (0,0), (-5,5)]
+
+THIRTY_DEGREES=(180 / math.pi) * 30
+class CircleSquad(Squad):
+  def __init__(self, *args, **kwargs):
+    Squad.__init__(self, *args, **kwargs)
+    self.positions = []
+    self.radius = 1
+    self.radian_offset = 0
+
+  def add_unit(self, unit):
+    Squad.add_unit(self, unit)
+    print self.getPositionOffsets()
+
+  def remove_unit(self, unit):
+    Squad.remove_unit(self, unit)
+
+  def getPositionOffsets(self):
+    radian_delta = (2*math.pi) / len(self.positions)
+    radian_offset = self.radian_offset
+    x = 0
+    y = 0
+    position_offsets = []
+    for i in xrange(len(self.positions)):
+      radian_offset += radian_delta
+      pos_x = x+(self.radius*math.cos(radian_offset))
+      pos_y = y+(self.radius*math.sin(radian_offset))
+      position_offsets.append((int(pos_x), int(pos_y)))
+
+    return position_offsets
+
+  position_offsets = property(getPositionOffsets)

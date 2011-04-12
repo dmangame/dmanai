@@ -34,6 +34,9 @@ class RushAI(okay.OkayAI):
         if unit in self.explorers:
           self.explore_position(unit)
 
+        if unit in self.capturers:
+          self.surround_position(unit, self.capturers[unit])
+
       if not self.defenders and self.buildings:
         b = random.choice(self.buildings.values())
         capturers = []
@@ -132,8 +135,6 @@ class RushAI(okay.OkayAI):
           self.searcher.force[unit] = True
           del self.capturers[unit]
           del self.explorers[unit]
-          self.defend_position(unit, destination)
-          self.defenders[unit] = destination
           return destination
         else:
           b = random.choice(self.buildings.values())
@@ -159,7 +160,7 @@ class RushAI(okay.OkayAI):
 
     def capture_position(self, units, position):
       for unit in units:
-        x,y = self.fuzz_position(position, unit.sight*2)
+        x,y = self.fuzz_position(position, unit.sight)
         self.aggressive[unit] = True
         self.explorers[unit] = True
         self.searcher.force[unit] = True
@@ -168,46 +169,53 @@ class RushAI(okay.OkayAI):
         self.capture_attempts[(x,y)] += 1
         unit.move((x,y))
 
-    def surround_position(self, units, position):
-      for unit in units:
-        x,y = self.fuzz_position(position, unit.sight*2)
-        self.aggressive[unit] = True
-        self.defenders[unit] = position
-        self.searcher.force[unit] = True
-        self.searcher.destinations[unit] = (x,y)
+    def surround_position(self, unit, position):
+      if unit.is_capturing:
+        return
 
+
+      ve = unit.in_range_enemies
+      if ve:
+        unit.shoot(ve[0].position)
+        return
+
+      bs = unit.visible_buildings
+      for b in bs:
+        if not b.team == self.team:
+          if not unit.position == b.position:
+            unit.move(b.position)
+          else:
+            self.capture_building(unit, b)
+          return
+
+      x,y = position
+      sight = self.sights[unit]
+      x,y = self.fuzz_position((x,y), sight)
+      unit.move((x,y))
 
     def defend_position(self, unit, position):
       if unit.is_capturing:
         return
 
 
-      b = self.buildings[position]
-      if b in self.visible_buildings:
-        ve = unit.in_range_enemies
-        if ve:
-          unit.shoot(ve[0].position)
+      ve = unit.in_range_enemies
+      if ve:
+        unit.shoot(ve[0].position)
+        return
+
+      bs = unit.visible_buildings
+      for b in bs:
+        if not b.team == self.team:
+          if not unit.position == b.position:
+            unit.move(b.position)
+          else:
+            self.capture_building(unit, b)
           return
 
-        else:
-          if not b.team == self.team:
-            self.capture_building(unit, b)
-            return
-
-          if unit.position == b.position or \
-             unit.calcDistance(b.position) > unit.sight:
-            x,y = b.position
-            sight = self.sights[unit] - 2
-
-            x,y = self.fuzz_position((x,y), sight)
-            unit.move((x,y))
-      else:
-        ve = unit.in_range_enemies
-        if ve:
-          unit.shoot(ve[0].position)
-        else:
-          unit.move(position)
-
+      x,y = position
+      sight = self.sights[unit]
+      x,y = self.fuzz_position((x,y), sight)
+      unit.move((x,y))
 
     def _unit_died(self, unit):
       if unit in self.capturers:
