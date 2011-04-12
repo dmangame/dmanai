@@ -28,7 +28,12 @@ class NearbySearcher():
 
     return min(self.mapsize,max(0, x)), min(self.mapsize,max(0, y))
 
+
+  # Searcher looking for the next place to put a unit
   def assign_next_destination(self, unit, no_destination_cb=None, arrived_cb=None):
+
+
+    destination = None
     if unit in self.destinations:
       if unit.position != self.destinations[unit]:
         if self.force[unit]:
@@ -37,11 +42,14 @@ class NearbySearcher():
         if self.destinations[unit] in self.to_visit:
           return
       else:
-        if arrived_cb: arrived_cb(unit)
+        if arrived_cb: 
+          destination = arrived_cb(unit)
         self.force[unit] = False
 
 
-    destination = self.next_destination(unit)
+    if not destination:
+      destination = self.next_destination(unit)
+
     if not destination:
       if no_destination_cb:
         destination = no_destination_cb(unit)
@@ -138,7 +146,7 @@ class OkayAI(ai.AI):
     return x,y
 
 
-  def form_circle(self, units, (x,y), radius, ro=0):
+  def form_circle(self, units, (x,y), radius, ro=0, only_stopped=False):
     if not units:
       return
 
@@ -147,6 +155,9 @@ class OkayAI(ai.AI):
     radian_offset = ro
     for unit in units:
       attempts = 0
+      if unit.is_moving and only_stopped:
+        continue
+
       while True:
         radian_offset += radian_delta
         pos_x = x+(radius*math.cos(radian_offset))

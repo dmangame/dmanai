@@ -131,6 +131,9 @@ class RushAI(okay.OkayAI):
           destination = self.capturers[unit]
           self.searcher.force[unit] = True
           del self.capturers[unit]
+          del self.explorers[unit]
+          self.defend_position(unit, destination)
+          self.defenders[unit] = destination
           return destination
         else:
           b = random.choice(self.buildings.values())
@@ -140,13 +143,13 @@ class RushAI(okay.OkayAI):
           return b.position
 
 
-      self.searcher.assign_next_destination(unit, no_destination_cb=no_dest, arrived_cb=no_dest)
+      self.searcher.assign_next_destination(unit, arrived_cb=no_dest, no_destination_cb=no_dest)
 
       unit.move(self.searcher.destinations[unit])
 
     def capture_building(self, unit, b):
       if not unit.position == b.position:
-        unit.move(b.position)
+        self.searcher.destinations[unit] = b.position
       else:
         unit.capture(b)
         if unit in self.explorers: del self.explorers[unit]
@@ -163,6 +166,7 @@ class RushAI(okay.OkayAI):
         self.searcher.destinations[unit] = (x,y)
         self.capturers[unit] = position
         self.capture_attempts[(x,y)] += 1
+        unit.move((x,y))
 
     def surround_position(self, units, position):
       for unit in units:

@@ -30,7 +30,7 @@ class CircleBlaster(okay.OkayAI):
       rotation_offset = 0
 
 
-      main_circle_size = len(available_units)
+      main_circle_size = len(available_units) - len(self.explorers)
 
 
       radius_m = 1
