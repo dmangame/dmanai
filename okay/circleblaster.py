@@ -7,13 +7,16 @@ AIClass="CircleBlaster"
 import random
 from collections import defaultdict
 from world import isValidSquare
+import sys
+import os
+sys.path.append(os.path.dirname(__file__))
+import okay
 
 THIRTY_DEGREES=(180 / math.pi) * 30
 
-class CircleBlaster(ai.AI):
+class CircleBlaster(okay.OkayAI):
     def _init(self):
       self.cluster_destination = None
-      self.buildings = set()
       self.explorers = []
       self.expansion_phase = 0
 
@@ -23,7 +26,7 @@ class CircleBlaster(ai.AI):
 
 
       for building in self.visible_buildings:
-        self.buildings.add(building)
+        self.buildings[building.position] = building
 
       cluster_size = 5
       rotation_offset = 0
@@ -41,24 +44,10 @@ class CircleBlaster(ai.AI):
           self.expansion_phase = random.randint(5, 10)
 
       if self.explorers:
-        # pick a random spot on the map
-        x,y = random.randint(0, self.mapsize), random.randint(0, self.mapsize)
-        origin = random.choice(list(self.buildings)).position
-        dx = x - origin[0]
-        dy = y - origin[1]
-
-
         for unit in self.explorers:
-          if unit.is_moving:
-            continue
-
-          x += dx
-          y += dy
-          x = min(self.mapsize, x)
-          y = min(self.mapsize, y)
-          y = max(0, y)
-          x = max(0, x)
-          unit.move((x,y))
+          self.searcher.assign_next_destination(unit)
+          unit.move(self.searcher.destinations[unit])
+          available_units.remove(unit)
 
       for i in xrange(len(available_units)/cluster_size+2):
         rotation_offset += THIRTY_DEGREES
@@ -69,7 +58,7 @@ class CircleBlaster(ai.AI):
         if self.my_buildings:
           pos = random.choice(self.my_buildings).position
         else:
-          pos = random.choice(list(self.buildings)).position
+          pos = random.choice(self.buildings.keys()).position
           radius = 1
 
         for unit in unit_cluster:
@@ -106,6 +95,7 @@ class CircleBlaster(ai.AI):
             hit = True
             unit.shoot(vunit.position)
             break
+
         if not hit and ire:
           unit.shoot(ire[0].position)
 
