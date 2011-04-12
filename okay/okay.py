@@ -361,7 +361,11 @@ class V(Squad):
     self.c = kwargs.get("center", None)
     self.r = kwargs.get("right", None)
     self.positions = ["l", "c", "r"]
-    self.position_offsets = [(-5,-5), (0,0), (-5,5)]
+
+  @property
+  def position_offsets(self):
+    return [(-5,-5), (0,0), (-5,5)]
+
 
 THIRTY_DEGREES=(180 / math.pi) * 30
 class CircleSquad(Squad):
