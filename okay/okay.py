@@ -20,7 +20,6 @@ class NearbySearcher():
 
 
   def to_area(self, (x,y),area_size=None):
-   
     if not area_size:
       area_size = self.AREA_SIZE
 
@@ -43,7 +42,7 @@ class NearbySearcher():
         if self.destinations[unit] in self.to_visit:
           return
       else:
-        if arrived_cb: 
+        if arrived_cb:
           destination = arrived_cb(unit)
         self.force[unit] = False
 
@@ -147,38 +146,6 @@ class OkayAI(ai.AI):
     return x,y
 
 
-  def form_circle(self, units, (x,y), radius, ro=0, only_stopped=False):
-    if not units:
-      return
-
-    # So, use radians (2pi form a circle)
-    radian_delta = (2*math.pi) / len(units)
-    radian_offset = ro
-    for unit in units:
-      attempts = 0
-      if unit.is_moving and only_stopped:
-        continue
-
-      while True:
-        radian_offset += radian_delta
-        pos_x = x+(radius*math.cos(radian_offset))
-        pos_y = y+(radius*math.sin(radian_offset))
-        pos_x = max(min(self.mapsize, pos_x), 0)
-        pos_y = max(min(self.mapsize, pos_y), 0)
-        attempts += 1
-        if isValidSquare((pos_x, pos_y), self.mapsize):
-          break
-
-        if attempts >= 3:
-          return
-
-      self.searcher.destinations[unit] = (pos_x, pos_y)
-      unit.move((pos_x, pos_y))
-
-  def collapse_circle(self, units, (x,y)): # So, use radians (2pi form a circle)
-    for unit in units:
-      unit.move((x, y))
-
 # A group of units that act as one. Sort of.
 class Squad(object):
   def __init__(self, *args, **kwargs):
@@ -201,8 +168,10 @@ class Squad(object):
         l += 1
     return l
 
-  @property
-  def is_moving(self, at_least=1):
+  def is_moving(self, at_least=None):
+    if not at_least:
+      at_least = len(self)
+
     count = 0
     for p in self.positions:
       unit = getattr(self, p)
@@ -225,7 +194,10 @@ class Squad(object):
 
   @property
   def sight(self):
-    return sum(map(lambda x: x.sight, self.units)) / len(self)
+    try:
+      return sum(map(lambda x: x.sight, self.units)) / len(self)
+    except:
+      return 0
 
   def units_in_place(self):
     for i in xrange(len(self.positions)):
@@ -252,8 +224,6 @@ class Squad(object):
       if not getattr(self, p):
         setattr(self, p, unit)
         return
-
-
 
     attr = "u%s"%(unit.unit_id)
     self.positions.append(attr)
@@ -317,9 +287,6 @@ class Squad(object):
     self.destination = position
 
   def spin(self):
-    if len(self) < 3:
-      self.destination = self.base
-
     self.units_in_place()
     self.capture_buildings()
     self.attack_nearby_enemies()
@@ -377,7 +344,6 @@ class CircleSquad(Squad):
 
   def add_unit(self, unit):
     Squad.add_unit(self, unit)
-    print self.getPositionOffsets()
 
   def remove_unit(self, unit):
     Squad.remove_unit(self, unit)

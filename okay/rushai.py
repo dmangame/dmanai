@@ -42,8 +42,6 @@ class RushAI(okay.OkayAI):
         capturers = []
         for unit in self.explorers:
           capturers.append(unit)
-        for unit in capturers:
-          self.capture_building(unit, b)
 
       # If we have enough units at a base, send them on the
       # offensive
@@ -96,20 +94,23 @@ class RushAI(okay.OkayAI):
       if explorer:
         self.explorers[unit] = True
 
+      # Assign to base with least number of units.
       if not explorer:
-        if self.buildings:
-          min_dist = 10000
+        if self.my_buildings:
           min_pos = None
-          for pos in self.buildings:
-            dist = unit.calcDistance(pos)
-            if dist < min_dist:
-              min_dist = dist
+          min_units = 100000
+          for pos in self.my_buildings:
+            defense = self.positions[pos]
+            num_units = len(defense)
+            if num_units < min_units and num_units > 5:
+              min_units = num_units
               min_pos = pos
 
           if not min_pos:
-            b = random.choice(self.buildings.values())
+            b = random.choice(self.my_buildings)
           else:
-            b = self.buildings[min_pos]
+            b = self.my_buildings[min_pos]
+
           self.defenders[unit] = b.position
           self.positions[b.position].add(unit)
 
@@ -123,11 +124,8 @@ class RushAI(okay.OkayAI):
           unit.shoot(e.position)
           return
 
-
       for b in unit.visible_buildings:
-        if not b.team == self.team:
-          self.capture_building(unit, b)
-          return
+        self.capture_building(unit, b)
 
       def no_dest(unit):
         if unit in self.capturers:
@@ -138,7 +136,7 @@ class RushAI(okay.OkayAI):
           return destination
         else:
           b = random.choice(self.buildings.values())
-          self.capture_building(unit, b)
+          self.surround_position(unit, b.position)
           self.aggressive[unit] = True
           self.searcher.force[unit] = True
           return b.position
@@ -149,8 +147,13 @@ class RushAI(okay.OkayAI):
       unit.move(self.searcher.destinations[unit])
 
     def capture_building(self, unit, b):
+      if b.team == self.team:
+        return
+
       if not unit.position == b.position:
         self.searcher.destinations[unit] = b.position
+        self.searcher.force[unit] = True
+        unit.move(b.position)
       else:
         unit.capture(b)
         if unit in self.explorers: del self.explorers[unit]
@@ -160,7 +163,7 @@ class RushAI(okay.OkayAI):
 
     def capture_position(self, units, position):
       for unit in units:
-        x,y = self.fuzz_position(position, unit.sight)
+        x,y = self.fuzz_position(position, unit.sight*4)
         self.aggressive[unit] = True
         self.explorers[unit] = True
         self.searcher.force[unit] = True
@@ -179,43 +182,40 @@ class RushAI(okay.OkayAI):
         unit.shoot(ve[0].position)
         return
 
-      bs = unit.visible_buildings
-      for b in bs:
-        if not b.team == self.team:
-          if not unit.position == b.position:
-            unit.move(b.position)
-          else:
-            self.capture_building(unit, b)
-          return
-
       x,y = position
       sight = self.sights[unit]
       x,y = self.fuzz_position((x,y), sight)
       unit.move((x,y))
 
+      bs = unit.visible_buildings
+      for b in bs:
+        self.capture_building(unit, b)
+
+
+    # Defendingis:
+    # Attacking
+    # Capturing
+    # Moving
+
+    # In the order.
     def defend_position(self, unit, position):
       if unit.is_capturing:
         return
-
 
       ve = unit.in_range_enemies
       if ve:
         unit.shoot(ve[0].position)
         return
 
-      bs = unit.visible_buildings
-      for b in bs:
-        if not b.team == self.team:
-          if not unit.position == b.position:
-            unit.move(b.position)
-          else:
-            self.capture_building(unit, b)
-          return
-
       x,y = position
       sight = self.sights[unit]
       x,y = self.fuzz_position((x,y), sight)
       unit.move((x,y))
+
+      bs = unit.visible_buildings
+      for b in bs:
+        self.capture_building(unit, b)
+
 
     def _unit_died(self, unit):
       if unit in self.capturers:

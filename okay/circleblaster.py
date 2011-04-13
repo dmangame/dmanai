@@ -21,12 +21,12 @@ class CircleBlaster(okay.OkayAI):
       self.squads = []
       self.radian_offset = 0
       self.explorer = okay.CircleSquad(mapsize=self.mapsize)
+      self.guarding = defaultdict(set)
 
     def _spin(self):
       available_units = filter(lambda x: not x.is_capturing, self.my_units)
       main_circle_size = len(available_units) - len(self.explorer)
 
-      radius = math.log(self.mapsize)*main_circle_size / 2
       radius_m = 1
       if self.expansion_phase:
         self.expansion_phase -= 1
@@ -35,30 +35,29 @@ class CircleBlaster(okay.OkayAI):
         if len(self.my_units) > 10 and random.random() > 0.95:
           self.expansion_phase = random.randint(5, 10)
 
-      for s in self.squads:
-        pos = s.base
 
-        if not self.my_buildings:
+      for p in self.buildings:
+        if not self.guarding[p]:
+          for g in self.guarding:
+            guards = self.guarding[g]
+            if len(guards) > 2:
+              leave_guard = guards[-1]
+              leave_guard.base = p
+              self.guarding[p].append(leave_guard)
+              break
+
+      for s in self.squads:
+        radius = min(math.log(self.mapsize)*main_circle_size/2, 5)
+
+        if not self.buildings[s.base].team == self.team:
           radius = 1
 
-        # Radius = 1/2 diameter
-        x_pos = random.randint(0, main_circle_size/2)*s.sight
-        y_pos = (main_circle_size/2) - x_pos
-
-        x_pos *= random.choice([-1, 1, 0.5, -0.5])
-        y_pos *= random.choice([-1, 1, 0.5, -0.5])
-        pos  = [x_pos+pos[0],y_pos+pos[1]]
-        pos[0] = min(max(0, pos[0]), self.mapsize)
-        pos[1] = min(max(0, pos[1]), self.mapsize)
-
-
         s.radius = radius * radius_m
-        s.destination = pos
+        s.destination = self.fuzz_position(s.base, s.sight)
         s.spin()
 
       # Send the explorer around
-
-      if not self.explorer.is_moving:
+      if not self.explorer.is_moving():
         destination = self.searcher.next_destination(self.explorer)
         self.searcher.destinations[self.explorer] = destination
         self.searcher.visiting[destination] = self.explorer
@@ -68,11 +67,21 @@ class CircleBlaster(okay.OkayAI):
 
 
     def _unit_spawned(self, unit):
-      if len(self.explorer) == 0 or len(self.my_units) / len(self.explorer) >= self.cluster_size:
+      def make_explorer():
         self.explorer.add_unit(unit)
         self.explorer.destination = unit.position
         self.explorer.base = unit.position
+
+      # if we have no explorers...
+      if len(self.explorer) == 0:
+        make_explorer()
         return
+
+      if len(self.my_units) / len(self.explorer) >= self.cluster_size:
+        if len(self.explorer) < 3:
+          make_explorer()
+          return
+
 
       for s in self.squads:
         if len(s) < self.cluster_size:
@@ -83,7 +92,8 @@ class CircleBlaster(okay.OkayAI):
       s = okay.CircleSquad(base=unit.position, mapsize=self.mapsize)
       self.squads.append(s)
       s.add_unit(unit)
-      s.radian_offset = random.randint(1, 5)*THIRTY_DEGREES
+      s.radian_offset = random.randint(1, 30)*THIRTY_DEGREES
+      self.guarding[s] = unit.position
 
     def _unit_died(self, unit):
       to_remove = []
@@ -96,4 +106,8 @@ class CircleBlaster(okay.OkayAI):
 
       for s in to_remove:
         self.squads.remove(s)
+        for g in self.guarding:
+          guards = self.guarding[g]
+          if s in guards:
+            guards.remove(s)
 

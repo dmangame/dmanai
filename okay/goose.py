@@ -84,7 +84,7 @@ class GooseAI(okay.OkayAI):
 
 
     for s in self.squads[i:]:
-      if not s.is_moving:
+      if not s.is_moving(at_least=1):
         # Pick closest point for unit to visit
         destination = self.searcher.next_destination(s)
         self.searcher.destinations[s] = destination
