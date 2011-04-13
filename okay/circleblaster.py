@@ -12,7 +12,7 @@ import os
 sys.path.append(os.path.dirname(__file__))
 import okay
 
-THIRTY_DEGREES=(180 / math.pi) * 30
+THIRTY_DEGREES=(180 / math.pi) * 31
 
 class CircleBlaster(okay.OkayAI):
     def _init(self):
@@ -32,7 +32,7 @@ class CircleBlaster(okay.OkayAI):
         self.expansion_phase -= 1
         radius_m = random.randint(5, 15)
       else:
-        if len(self.my_units) > 10 and random.random() > 0.95:
+        if len(self.my_units) > 10 and random.random() > 0.99:
           self.expansion_phase = random.randint(5, 10)
 
 
@@ -47,7 +47,7 @@ class CircleBlaster(okay.OkayAI):
               break
 
       for s in self.squads:
-        radius = min(math.log(self.mapsize)*main_circle_size/2, 5)
+        radius = max(math.log(self.mapsize)*main_circle_size/2, 5)
 
         if not self.buildings[s.base].team == self.team:
           radius = 1
@@ -92,7 +92,7 @@ class CircleBlaster(okay.OkayAI):
       s = okay.CircleSquad(base=unit.position, mapsize=self.mapsize)
       self.squads.append(s)
       s.add_unit(unit)
-      s.radian_offset = random.randint(1, 30)*THIRTY_DEGREES
+      s.radian_offset = random.randint(10, 50)*THIRTY_DEGREES
       self.guarding[s] = unit.position
 
     def _unit_died(self, unit):

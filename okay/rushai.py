@@ -23,6 +23,7 @@ class RushAI(okay.OkayAI):
 
       self.aggressive = defaultdict(bool)
       self.positions = defaultdict(set)
+      self.surrounding = defaultdict(lambda: 10)
 
       self.map_reductions = 0
 
@@ -36,6 +37,7 @@ class RushAI(okay.OkayAI):
 
         if unit in self.capturers:
           self.surround_position(unit, self.capturers[unit])
+
 
       if not self.defenders and self.buildings:
         b = random.choice(self.buildings.values())
@@ -172,7 +174,7 @@ class RushAI(okay.OkayAI):
         self.capture_attempts[(x,y)] += 1
         unit.move((x,y))
 
-    def surround_position(self, unit, position):
+    def surround_position(self, unit, position, attempts=3):
       if unit.is_capturing:
         return
 
@@ -191,12 +193,17 @@ class RushAI(okay.OkayAI):
       for b in bs:
         self.capture_building(unit, b)
 
+      if unit.calcDistance(position) <= unit.sight:
+        self.surrounding[unit] -= 1
+        if self.surrounding[unit] <= 0:
+          del self.surrounding[unit]
+          del self.capturers[unit]
+
 
     # Defendingis:
     # Attacking
     # Capturing
     # Moving
-
     # In the order.
     def defend_position(self, unit, position):
       if unit.is_capturing:
