@@ -70,7 +70,7 @@ class NearbySearcher():
 
     min_dist = 10000000000
     min_pos = None
-    tries = 10
+    tries = 15
     while tries > 0:
       pos = random.choice(list(self.to_visit))
       tries -= 1
@@ -207,7 +207,12 @@ class Squad(object):
       if unit and not unit.is_capturing:
         pos = self.destination or self.base
         off = self.position_offsets[i]
-        dest = (pos[0] + off[0], pos[1]+off[1])
+        d_x, d_y = (pos[0] + off[0], pos[1]+off[1])
+        d_x = max(min(self.mapsize, d_x), 0)
+        d_y = max(min(self.mapsize, d_y), 0)
+
+        dest = (d_x, d_y)
+
         if dest != unit.position:
           try:
             unit.move(dest)

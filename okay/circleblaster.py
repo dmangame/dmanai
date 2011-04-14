@@ -26,14 +26,15 @@ class CircleBlaster(okay.OkayAI):
     def _spin(self):
       available_units = filter(lambda x: not x.is_capturing, self.my_units)
       main_circle_size = len(available_units) - len(self.explorer)
+      main_circle_size /= 2
 
       radius_m = 1
       if self.expansion_phase:
         self.expansion_phase -= 1
-        radius_m = random.randint(5, 15)
+        radius_m = random.randint(10, 50)
       else:
-        if len(self.my_units) > 10 and random.random() > 0.99:
-          self.expansion_phase = random.randint(5, 10)
+        if len(self.my_units) > 30 and random.random() > 0.99:
+          self.expansion_phase = random.randint(10, 50)
 
 
       for p in self.buildings:
@@ -46,11 +47,15 @@ class CircleBlaster(okay.OkayAI):
               self.guarding[p].append(leave_guard)
               break
 
+      r_offset = 0
       for s in self.squads:
         radius = max(math.log(self.mapsize)*main_circle_size/2, 5)
+        r_offset += THIRTY_DEGREES
+        s.radian_offset = r_offset
 
         if not self.buildings[s.base].team == self.team:
-          radius = 1
+          radius = 5
+          radius_m = 1
 
         s.radius = radius * radius_m
         s.destination = self.fuzz_position(s.base, s.sight)
@@ -78,7 +83,7 @@ class CircleBlaster(okay.OkayAI):
         return
 
       if len(self.my_units) / len(self.explorer) >= self.cluster_size:
-        if len(self.explorer) < 3:
+        if len(self.explorer) < 5:
           make_explorer()
           return
 
