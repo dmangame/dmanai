@@ -53,9 +53,10 @@ class CircleBlaster(okay.OkayAI):
         r_offset += THIRTY_DEGREES
         s.radian_offset = r_offset
 
-        if not self.buildings[s.base].team == self.team:
-          radius = 5
-          radius_m = 1
+        if s.base in self.buildings:
+          if not self.buildings[s.base].team == self.team:
+            radius = 5
+            radius_m = 1
 
         s.radius = radius * radius_m
         s.destination = self.fuzz_position(s.base, s.sight)

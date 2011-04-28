@@ -73,18 +73,17 @@ class GooseAI(okay.OkayAI):
       for b in capture_buildings:
         if i >= len(self.squads):
           break
-        squad_per_b
         deploy = self.squads[i:i+squad_per_b]
         i += squad_per_b
         for s in deploy:
-          if s.full_squad:
+          if s.full_squad and len(s) >= 3:
             s.capture_building(b)
           else:
             break
 
 
     for s in self.squads[i:]:
-      if not s.is_moving(at_least=1):
+      if not s.is_moving(at_least=2):
         # Pick closest point for unit to visit
         destination = self.searcher.next_destination(s)
         self.searcher.destinations[s] = destination

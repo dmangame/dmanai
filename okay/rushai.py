@@ -80,6 +80,7 @@ class RushAI(okay.OkayAI):
         self.make_defender(unit)
 
     def _unit_died(self, unit):
+      self.highlightRegion(unit.position)
       if unit in self.capturers:
         del self.capturers[unit]
 
@@ -91,6 +92,7 @@ class RushAI(okay.OkayAI):
           self.positions[pos].remove(unit)
 
     def make_capturer(self, unit, position):
+      self.highlightLine(unit.position, position)
       x,y = self.fuzz_position(position, unit.sight*4)
       self.searcher.force[unit] = True
       self.searcher.destinations[unit] = (x,y)
@@ -160,6 +162,11 @@ class RushAI(okay.OkayAI):
 
       for p in self.buildings:
         if self.buildings[p] not in self.visible_buildings:
+          building_deaths = 2*self.explorer_death_positions[self.searcher.to_area(p)]
+
+          if len(available_offense) <= building_deaths:
+            continue
+
           map(lambda u: self.make_capturer(u, p), available_offense)
 
           for unit in available_offense:
@@ -167,6 +174,8 @@ class RushAI(okay.OkayAI):
               if unit in p_set:
                 p_set.remove(unit)
           break
+
+
 
       # If we don't look for a building, how about we send
       # a bunch of guys to a place where the most of our
@@ -219,7 +228,7 @@ class RushAI(okay.OkayAI):
       unit.move(self.searcher.destinations[unit])
 
     def capture_building(self, unit, b):
-      if b.team == self.team:
+      if b.team == self.team or unit.is_capturing:
         return
 
       if not unit.position == b.position:
