@@ -97,7 +97,7 @@ class RushAI(okay.OkayAI):
       self.searcher.force[unit] = True
       self.searcher.destinations[unit] = (x,y)
       self.capturers[unit] = position
-      self.capture_attempts[(x,y)] += 1
+#      self.capture_attempts[position] += 1
 
     def make_defender(self, unit, building=None):
       if not building:
@@ -162,11 +162,12 @@ class RushAI(okay.OkayAI):
 
       for p in self.buildings:
         if self.buildings[p] not in self.visible_buildings:
-          building_deaths = 2*self.explorer_death_positions[self.searcher.to_area(p)]
+          building_deaths = self.capture_attempts[p]
 
           if len(available_offense) <= building_deaths:
             continue
 
+          self.capture_attempts[p] += 1
           map(lambda u: self.make_capturer(u, p), available_offense)
 
           for unit in available_offense:
