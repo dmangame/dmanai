@@ -159,7 +159,7 @@ class SystematicSearcher(ai.AI):
           unit.move(locations[unit])
 
     def _spin(self):
-      self.guards = set(guard for guard in self.guards if guard.isAlive())
+      self.guards = set(guard for guard in self.guards if guard.is_alive)
       self.known_buildings = set(self.visible_buildings).union(self.known_buildings)
       if len(self.guards) < len(self.known_buildings):
         self.allocate_guards()
