@@ -3,11 +3,25 @@ import ai
 import math
 from collections import defaultdict
 import itertools
-AIClass="WedgeAI"
+AIClass="Wedge"
 import logging
 log = logging.getLogger(AIClass)
 
-class WedgeAI(ai.AI):
+class Base(object):
+    def __init__(self, b):
+      self.building = b
+      self.capturing = False
+      self.defenders = 0
+
+    @property
+    def capturing(self):
+      return self.capturing
+
+    @property
+    def building(self):
+      return self.building
+
+class Wedge(ai.AI):
     def _init(self):
       log.info("Initializing: Current Turn: %s", self.current_turn)
       self.preferred_defenders = 1
@@ -30,16 +44,16 @@ class WedgeAI(ai.AI):
       self.do_scouting = True
       self.scout_waypoints = []      
       self.prev_waypoint = 0
+      self.waypoint_distance = 1
+      self.tries = 0 # tries before moving to next waypoint
       
       # buildings
       self.targets = []
       self.bases = []
 
-      self.setup_waypoints()
-
-    def setup_waypoints(self):
-      modifier = 25
-      distance = 25
+    def setup_waypoints(self, unit):
+      self.waypoint_distance = math.floor(unit.sight * 1.8)
+      distance = self.waypoint_distance
       compass = ["west","south","east","north"]
       compass_cycler = itertools.cycle(compass) 
       cx = int(self.mapsize / 2)
@@ -47,20 +61,46 @@ class WedgeAI(ai.AI):
       self.scout_waypoints.append((cx,cy))
       x = cx
       y = cy
-      while( x < self.mapsize and x >= 0 and y < self.mapsize and y >= 0):
+      create = True
+      while(create):
         c = compass_cycler.next()
         if c == "west":
           x = x + distance
         elif c == "south":
           y = y + distance
-          distance = distance + modifier
+          distance = distance + self.waypoint_distance
         elif c == "east":
           x = x - distance
         else:
           y = y - distance
-          distance = distance + modifier
+          distance = distance + self.waypoint_distance
 
-        self.scout_waypoints.append((x,y))      
+        if (x > self.mapsize or x < 1 or y > self.mapsize or y < 1):
+          create = False
+
+        if x < 1:
+          x = 1
+        if y < 1:
+          y = 1
+        if x > self.mapsize:
+          x = self.mapsize -1
+        if y > self.mapsize:
+          y = self.mapsize -1
+
+        self.scout_waypoints.append((x,y))
+  
+      # Add a loop around the outer border
+      y = self.mapsize -1
+      self.scout_waypoints.append((x,y))
+      
+      x = 1
+      self.scout_waypoints.append((x,y))
+
+      y = 1
+      self.scout_waypoints.append((x,y))
+
+      x = self.mapsize -1
+      self.scout_waypoints.append((x,y))
       
     def defend(self, unit):
       if(self.attack(unit)):
@@ -85,10 +125,9 @@ class WedgeAI(ai.AI):
       self.attack(unit)
 
     def wander(self, unit):
-      if not self.attack(unit):
-        if not unit.is_moving:
-          x,y = random.randint(0, self.mapsize), random.randint(0,self.mapsize)
-          unit.move((x,y))
+      if not unit.is_moving:
+        x,y = random.randint(0, self.mapsize), random.randint(0,self.mapsize)
+        unit.move((x,y))
       
     def seek_and_capture(self, unit, building):
       if not self.attack(unit):
@@ -184,6 +223,8 @@ class WedgeAI(ai.AI):
 
     def assign_scout(self, unit):
       if (len(self.scouts) == 0 and self.do_scouting == True):
+        if (len(self.scout_waypoints) == 0):
+          self.setup_waypoints(unit)
         self.scouts.append(unit)
         return True
     
@@ -200,9 +241,13 @@ class WedgeAI(ai.AI):
         self.attackers.remove(unit)
       if unit in self.scouts:
         self.scouts.remove(unit)
-        print "*********************************Scout died!"
         if(self.prev_waypoint > 0):
-          self.prev_waypoint = self.prev_waypoint - 1
+          self.tries = self.tries + 1
+          if(self.tries >= 2):
+            self.prev_waypoint = self.prev_waypoint + 1
+          else: 
+            self.prev_waypoint = self.prev_waypoint - 1
+          
 
     def _spin(self):      
       self.clearHighlights()
@@ -223,8 +268,8 @@ class WedgeAI(ai.AI):
           if b in self.bases:
             if not b.team == self.team:
               self.bases.remove(b)
-              del self.perimeters[b]
-              del self.perimeter_cyclers[b]
+              #del self.perimeters[b]
+              #del self.perimeter_cyclers[b]
               self.targets.append(b)
           elif b in self.targets:
             if b.team == self.team:
@@ -258,12 +303,13 @@ class WedgeAI(ai.AI):
               unit.move(self.perimeter_cyclers[self.defense_assignments[unit]].next())
 
         if unit in self.attackers:
-          if (len(self.targets) > 0):
-            if not self.attack(unit):
-              self.capture_target(unit, self.targets[0])
-          elif (len(self.visible_enemies) > 0):
+          if (len(self.visible_enemies) > 0):
             if not self.attack(unit):
               enemies = list(self.visible_enemies)
               unit.move(enemies[0].position)
+          elif (len(self.targets) > 0):
+            if not self.attack(unit):
+              self.capture_target(unit, self.targets[0])
           else:
-            self.wander(unit)
+            if not self.attack(unit):
+              self.wander(unit)
