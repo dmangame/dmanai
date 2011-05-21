@@ -1,3 +1,22 @@
-This is the main repo for contestants in dmangame.
+This is the main repo for contestants in dmangame
+(http://github.com/okayzed/dmangame). If you'd like for other players to be
+able to play against your AI, fork this repository and add your AI to it.
 
-Fork & Clone AIs as much as you can / want.
+To run an AI from a user's repository, supply an AI string in the following format:
+
+github_user:path_to_dep1.py,path_to_dep2.py,path_to_ai_module.py
+
+for example:
+
+  python main.py okayzed:okay/okay.py,okay/goose.py ai/killncapture.py
+
+
+This will download dmanai/okay/okay.py and dmanai/okay/goose.py and instantiate
+an AI instance from the AI in goose.py to run against the local file
+ai/killncapture.py.
+
+Remember to look at AIs before you run them, as you are running remote code and
+it can potentially be dangerous.
+
+The AI strings also work with appengine, which is slightly more secure for the
+end user.
