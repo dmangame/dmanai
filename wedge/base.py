@@ -34,7 +34,8 @@ class Wedge(ai.AI):
       # attackers
       self.attackers = []
       self.attacker_position = (0,0)
-      self.attacker_distance = (8,4)      
+      self.attacker_distance = (8,4)     
+      self.wander_radius = 35 
        
       # dummy units
       self.drones = []
@@ -75,17 +76,16 @@ class Wedge(ai.AI):
           y = y - distance
           distance = distance + self.waypoint_distance
 
-        if (x > self.mapsize or x < 1 or y > self.mapsize or y < 1):
-          create = False
-
-        if x < 1:
-          x = 1
-        if y < 1:
-          y = 1
-        if x > self.mapsize:
-          x = self.mapsize -1
-        if y > self.mapsize:
-          y = self.mapsize -1
+        create = self.valid_position(x,y)
+        if create == False:
+          if x < 1:
+            x = 1
+          if y < 1:
+            y = 1
+          if x > self.mapsize:
+            x = self.mapsize -1
+          if y > self.mapsize:
+            y = self.mapsize -1
 
         self.scout_waypoints.append((x,y))
   
@@ -125,9 +125,29 @@ class Wedge(ai.AI):
       self.attack(unit)
 
     def wander(self, unit):
-      if not unit.is_moving:
-        x,y = random.randint(0, self.mapsize), random.randint(0,self.mapsize)
-        unit.move((x,y))
+      if not unit.is_moving:  
+        unit.move(self.position_on_circle(self.wander_radius, unit.position[0], unit.position[1]))
+
+    def position_on_circle(self, radius, cx, cy):
+      x,y = -1,-1
+
+      while(self.valid_position(x,y) == False):
+        angle = random.randint(0,360)
+        x = cx + radius * math.sin(angle)
+        y = cy + radius * math.cos(angle)
+      return (x,y)        
+
+    def valid_position(self, x, y):
+      if x < 0:
+        return False
+      if x >= self.mapsize:
+        return False
+      if y < 0:
+        return False
+      if y >= self.mapsize:
+        return False
+
+      return True
       
     def seek_and_capture(self, unit, building):
       if not self.attack(unit):
@@ -186,17 +206,13 @@ class Wedge(ai.AI):
     def establish_perimeter(self, building):
       perimeter = []      
       for i in range(0, self.preferred_defenders):
-        x = building.position[0]
-        y = building.position[1]
-        while(x == building.position[0] and y == building.position[1]):
+        x = -1
+        y = -1
+        while(self.valid_position(x,y) == False):
           x = random.randint(building.position[0] - self.perimeter_distance, building.position[0] + self.perimeter_distance)
           y = random.randint(building.position[1] - self.perimeter_distance, building.position[1] + self.perimeter_distance)
         
         perimeter.append((x,y))
-
-      for p in perimeter:
-        if (p[0] < 0 or p[0] > self.mapsize-1 or p[1] < 0 or p[1] > self.mapsize-1):
-          perimeter.remove(p)
       
       self.perimeters[building] = perimeter
       self.perimeter_cyclers[building] = itertools.cycle(self.perimeters[building])
@@ -303,13 +319,12 @@ class Wedge(ai.AI):
               unit.move(self.perimeter_cyclers[self.defense_assignments[unit]].next())
 
         if unit in self.attackers:
-          if (len(self.visible_enemies) > 0):
-            if not self.attack(unit):
-              enemies = list(self.visible_enemies)
-              unit.move(enemies[0].position)
-          elif (len(self.targets) > 0):
-            if not self.attack(unit):
-              self.capture_target(unit, self.targets[0])
-          else:
-            if not self.attack(unit):
-              self.wander(unit)
+          if not self.attack(unit):
+            if not self.capture(unit):
+              if len(self.targets) > 0:
+                self.capture_target(unit, self.targets[0])
+              elif len(self.visible_enemies) > 0:
+                enemies = list(self.visible_enemies)
+                unit.move(enemies[0].position)
+              else:
+                self.wander(unit)
