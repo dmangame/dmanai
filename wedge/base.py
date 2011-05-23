@@ -3,128 +3,128 @@ import ai
 import math
 from collections import defaultdict
 import itertools
+from world import isValidSquare
+
 AIClass="Wedge"
-import logging
-log = logging.getLogger(AIClass)
 
-class Base(object):
-    def __init__(self, b):
+def calc_distance(a, b):
+  x1,y1 = a[0], a[1]
+  x2,y2 = b[0], b[1]
+  return ( abs(x1 - x2) + abs(y1 - y2) )
+
+class BuildingInfo(object):
+    def __init__(self, ai, b):      
+      self.ai = ai
       self.building = b
-      self.capturing = False
-      self.defenders = 0
-
-    @property
-    def capturing(self):
-      return self.capturing
-
-    @property
-    def building(self):
-      return self.building
+      
+      # Each building has 1 defender, he patrols the perimeter and alerts when threatened
+      self.defender = None
+      
+      # Number of friends and enemies in the area
+      self.friends = 0
+      self.enemies = 0
+      
+      # Perimeter coordinates
+      self.perimeter_distance = 10
+      self.perimeter = []
+      self.perimeter_cycler = itertools.cycle(self.perimeter)
+      
+      # Capture variables
+      self.capturing = False        # Do we have a unit capturing this building?
+      self.attempt_capture = False  # Should we attempt to capture this building?
+      
+    def establish_perimeter(self, distance):
+      self.perimeter_distance = distance
+      self.perimeter = [] 
+      
+      # center
+      cx = self.building.position[0]
+      cy = self.building.position[1]
+      
+      # upper left
+      x = cx - distance
+      y = cy - distance
+      while not isValidSquare( (x,y), self.ai.mapsize ):
+        x += 1
+        y += 1
+      self.perimeter.append( (x, y) )
+      
+      # upper right
+      x = cx + distance
+      y = cy - distance
+      while not isValidSquare( (x,y), self.ai.mapsize ):
+        x -= 1
+        y += 1
+      self.perimeter.append( (x, y) )
+      
+      # lower right
+      x = cx + distance
+      y = cy + distance
+      while not isValidSquare( (x,y), self.ai.mapsize ):
+        x -= 1
+        y -= 1
+      self.perimeter.append( (x, y) )
+      
+      # lower left
+      x = cx - distance
+      y = cy + distance
+      while not isValidSquare( (x,y), self.ai.mapsize ):
+        x -= 1
+        y += 1
+      self.perimeter.append( (x, y) )
+           
+      self.perimeter_cycler = itertools.cycle(self.perimeter)
+      
+class UnitInfo(object):
+    def __init__(self, ai, unit):
+      self.ai = ai
+      self.unit = unit
+      
+class MapSearch(object):
+    def __init__(self, size):
+      self.mapsize = size   # size of map
+      self.points = []      # (x,y) coords we need to explore
+      self.sight = 20       # how far can our units see?
+      
+    def setup(self):
+      for y in range(0, self.mapsize, self.sight):
+        for x in range(0, self.mapsize, self.sight):
+          self.points.append( (x,y) )
+    
+    # returns nearest point on map to unit
+    def nearest(self, position):
+      closest = self.mapsize
+      point_found = None
+      
+      for p in self.points:
+        distance = calc_distance( p, position )
+        if distance < closest:
+          closest = distance
+          point_found = p
+          
+      return point_found
+      
+    def update(self, units):
+      for p in self.points[:]:
+          for unit in units:
+            if unit.calcDistance( p ) < unit.sight / 2:
+              self.points.remove(p)
+              break
 
 class Wedge(ai.AI):
     def _init(self):
-      log.info("Initializing: Current Turn: %s", self.current_turn)
-      self.preferred_defenders = 1
       self.perimeter_distance = 6
-      self.perimeters = {}
-      self.perimeter_cyclers = {}
-      self.defense_assignments = {}
-      self.defenders = []
-      
-      # attackers
-      self.attackers = []
-      self.attacker_position = (0,0)
-      self.attacker_distance = (8,4)     
-      self.wander_radius = 35 
        
-      # dummy units
+      # our default units
       self.drones = []
+      self.wander_radius = 25
 
       # scouting
-      self.scouts = []
-      self.do_scouting = True
-      self.scout_waypoints = []      
-      self.prev_waypoint = 0
-      self.waypoint_distance = 1
-      self.tries = 0 # tries before moving to next waypoint
-      self.sight = 0
+      self.map = MapSearch(self.mapsize)
+      self.map.setup()
       
       # buildings
-      self.targets = []
-      self.bases = []
-
-    def setup_waypoints(self, unit):
-      self.sight = unit.sight
-      self.waypoint_distance = math.floor(self.sight * 1.8)
-      distance = self.waypoint_distance
-      compass = ["west","south","east","north"]
-      compass_cycler = itertools.cycle(compass) 
-      cx = int(self.mapsize / 2)
-      cy = int(self.mapsize / 2)
-      self.scout_waypoints.append((cx,cy))
-      x = cx
-      y = cy
-      create = True
-      while(create):
-        c = compass_cycler.next()
-        if c == "west":
-          x = x + distance
-        elif c == "south":
-          y = y + distance
-          distance = distance + self.waypoint_distance
-        elif c == "east":
-          x = x - distance
-        else:
-          y = y - distance
-          distance = distance + self.waypoint_distance
-
-        create = self.valid_position(x,y)
-        if create == False:
-          if x < 1:
-            x = 1
-          if y < 1:
-            y = 1
-          if x > self.mapsize:
-            x = self.mapsize -1
-          if y > self.mapsize:
-            y = self.mapsize -1
-
-        self.scout_waypoints.append((x,y))
-  
-      # Add a loop around the outer border
-      y = self.mapsize -1
-      self.scout_waypoints.append((x,y))
-      
-      x = 1
-      self.scout_waypoints.append((x,y))
-
-      y = 1
-      self.scout_waypoints.append((x,y))
-
-      x = self.mapsize -1
-      self.scout_waypoints.append((x,y))
-      
-    def defend(self, unit):
-      if(self.attack(unit)):
-        return True
-    
-      buildings = unit.visible_buildings
-      if unit.is_capturing:
-        return True
-
-      for b in buildings:
-        if b.team == self.team:
-          continue
-
-        if not unit.is_capturing:
-          if unit.position == b.position:
-            unit.capture(b)
-          else:
-            unit.move(b.position)
-
-        return True
-
-      self.attack(unit)
+      self.buildings = defaultdict(BuildingInfo)
 
     def wander(self, unit):
       if not unit.is_moving:  
@@ -133,28 +133,11 @@ class Wedge(ai.AI):
     def position_on_circle(self, radius, cx, cy):
       x,y = -1,-1
 
-      while(self.valid_position(x,y) == False):
+      while not isValidSquare( (x,y), self.mapsize):
         angle = random.randint(0,360)
         x = cx + radius * math.sin(angle)
         y = cy + radius * math.cos(angle)
       return (x,y)        
-
-    def valid_position(self, x, y):
-      if x < 0:
-        return False
-      if x >= self.mapsize:
-        return False
-      if y < 0:
-        return False
-      if y >= self.mapsize:
-        return False
-
-      return True
-      
-    def seek_and_capture(self, unit, building):
-      if not self.attack(unit):
-        if not self.capture_target(unit, building):      
-          unit.move(building.position)
 
     def capture_target(self, unit, building):
       if unit.is_capturing:
@@ -190,65 +173,14 @@ class Wedge(ai.AI):
       if unit.in_range_enemies:
         unit.shoot(unit.in_range_enemies[0].position)
         return True
-
+    
     def scout(self, unit):
-      if self.do_scouting == False:
-        self.attackers.append(unit)
-        self.scouts.remove(unit)
-        return True
-
-      if unit.is_moving:
-        return True
-
-      if self.prev_waypoint >= len(self.scout_waypoints):
-        self.do_scouting = False
-        return True
-
-      if (unit.position == self.scout_waypoints[self.prev_waypoint]):
-        self.prev_waypoint = self.prev_waypoint + 1
-
-      unit.move(self.scout_waypoints[self.prev_waypoint])
-
-    def establish_perimeter(self, building):
-      perimeter = []      
-      for i in range(0, self.preferred_defenders):
-        x = -1
-        y = -1
-        while(self.valid_position(x,y) == False):
-          x = random.randint(building.position[0] - self.perimeter_distance, building.position[0] + self.perimeter_distance)
-          y = random.randint(building.position[1] - self.perimeter_distance, building.position[1] + self.perimeter_distance)
-        
-        perimeter.append((x,y))
-      
-      self.perimeters[building] = perimeter
-      self.perimeter_cyclers[building] = itertools.cycle(self.perimeters[building])
-
-    def assign_base(self, unit):    
-      if (len(self.scouts) == 0):
-        return False
-      if (len(self.bases) <= 0):
-        return False
-  
-      if (len(self.defenders) < len(self.bases) * self.preferred_defenders):
-        counters = defaultdict(int)
-        for building in self.bases:
-          counters[building] = 0
-          for k,v in self.defense_assignments.iteritems():
-            if (v == building):
-              counters[building] = counters[building] + 1
-
-        assign_to = min(counters, key = lambda x: counters.get(x))
-        self.defense_assignments[unit] = assign_to
-        return True
-      
-      return False
-
-    def assign_scout(self, unit):
-      if (len(self.scouts) == 0 and self.do_scouting == True):
-        if (len(self.scout_waypoints) == 0):
-          self.setup_waypoints(unit)
-        self.scouts.append(unit)
-        return True
+      if not self.capture(unit):
+        waypoint = self.map.nearest( unit.position )
+        if waypoint == None:
+          self.wander( unit )
+        else:
+          unit.move( waypoint )
     
     def _unit_spawned(self, unit):
       self.drones.append(unit)
@@ -256,80 +188,82 @@ class Wedge(ai.AI):
     def _unit_died(self, unit):
       if unit in self.drones:
         self.drones.remove(unit)
-      if unit in self.defenders:
-        self.defenders.remove(unit)
-        del self.defense_assignments[unit]
-      if unit in self.attackers:
-        self.attackers.remove(unit)
-      if unit in self.scouts:
-        self.scouts.remove(unit)
-        if(self.prev_waypoint > 0):
-          self.tries = self.tries + 1
-          if(self.tries >= 2):
-            self.prev_waypoint = self.prev_waypoint + 1
-          else: 
-            self.prev_waypoint = self.prev_waypoint - 1
+        return
+        
+      for key, value in self.buildings.iteritems():
+        if unit == value.defender:
+          value.defener = None
           
-
     def _spin(self):      
+      # draw our waypoints, for debugging
       self.clearHighlights()
-      if (len(self.scout_waypoints) > 0):
-        prev_waypoint = self.scout_waypoints[0]
-        for waypoint in self.scout_waypoints:
-          self.highlightLine(prev_waypoint, waypoint)
-          prev_waypoint = waypoint
+      for p in self.map.points:
+        self.highlightLine( (p[0],p[1]), (p[0]+1, p[1]+1) )
+        
+      # update our map
+      self.map.update(self.my_units)      
 
-      if (self.current_turn % 250 == 0):
-        self.preferred_defenders = self.preferred_defenders + 1
-        self.perimeter_distance = self.preferred_defenders * 3
-        for b in self.bases:
-          self.establish_perimeter(b)
-      
-      if self.visible_buildings:
-        for b in self.visible_buildings:
-          if b in self.bases:
-            if not b.team == self.team:
-              self.bases.remove(b)
-              self.targets.append(b)
-          elif b in self.targets:
-            if b.team == self.team:
-              self.establish_perimeter(b)
-              self.bases.append(b)
-              self.targets.remove(b)
+      # Check for perimeter distance increase
+      if self.current_turn % 250 == 0:
+        self.perimeter_distance += 5  
+        
+      # Add new buildings we discover
+      for building in self.visible_buildings:
+        if not building in self.buildings:
+          self.buildings[building] = BuildingInfo(self, building)
+          self.buildings[building].establish_perimeter(self.perimeter_distance)
+         
+      # Loop through all known buildings: 
+      # value = BuildingInfo instance for the key = building
+      for key, value in self.buildings.iteritems():
+        if len(value.perimeter) == 0:
+          value.establish_perimeter(self.perimeter_distance)
+          
+        print len(value.perimeter)
+        
+        # update perimeter if the distance has changed
+        if self.perimeter_distance != value.perimeter_distance:
+          value.establish_perimeter(self.perimeter_distance)
+
+        # our buildings require specific actions
+        if key.team == self.team:
+        
+          # if the building has no defender, request one (preferably closest available unit)
+          if value.defender == None:
+            closest = self.mapsize
+            drone_assigned = None
+            
+            # loop through drones, find closest one
+            for drone in self.drones:
+              distance = drone.calcDistance(value.building.position)
+              
+              if distance < closest:
+                closest = distance
+                drone_assigned = drone
+            
+            # assign drone to defend & remove from drone pool
+            if drone_assigned != None:
+              value.defender = drone_assigned
+              self.drones.remove(drone_assigned)
+          # if we have a defender on this building, make sure its alive
           else:
-            if b.team == self.team:
-              self.establish_perimeter(b)
-              self.bases.append(b)
-            else:
-              self.targets.append(b)
+            if not value.defender.is_alive:
+              value.defender = None
+              continue
+            
+          # Defender patrols the base perimeter
+          defender = value.defender
+          if defender != None:
+            if not self.attack(defender):
+              if not self.capture(defender):
+                if not defender.is_moving:
+                  defender.move( value.perimeter_cycler.next() )
     
-      for unit in self.my_units:
-        if unit in self.drones:
-          if self.assign_base(unit):
-            self.defenders.append(unit)
-          else:
-            if not self.assign_scout(unit):
-              self.attackers.append(unit)
-              self.attacker_position
-          self.drones.remove(unit)
-
-        if unit in self.scouts:
+      # Loop through our drones
+      for unit in self.drones:
+        if not self.attack(unit):
           if not self.capture(unit):
-            self.scout(unit)
-
-        if unit in self.defenders:
-          if not self.defend(unit):
-            if not unit.is_moving:
-              unit.move(self.perimeter_cyclers[self.defense_assignments[unit]].next())
-
-        if unit in self.attackers:
-          if not self.attack(unit):
-            if not self.capture(unit):
-              if len(self.targets) > 0:
-                if not self.capture_target(unit, self.targets[0]):
-                  self.wander(unit)
-              elif len(self.visible_enemies) > 0:
-                enemies = list(self.visible_enemies)
-                unit.move(enemies[0].position)
-              else:
-                self.wander(unit)
+            if self.visible_enemies:
+              unit.move( self.visible_enemies[0].position )
+            else:
+              self.wander(unit)
