@@ -160,6 +160,11 @@ class Wedge(ai.AI):
       if unit.is_capturing:
         return True
 
+      for friend in self.my_units:
+        if friend != unit:
+          if friend.is_capturing and friend.position == building.position:
+            return False
+
       if unit.position == building.position:
         unit.capture(building)
       else:
@@ -182,9 +187,8 @@ class Wedge(ai.AI):
         return True
 
     def attack(self, unit):
-      victims = unit.visible_enemies
-      if victims:
-        unit.shoot(victims[0].position)
+      if unit.in_range_enemies:
+        unit.shoot(unit.in_range_enemies[0].position)
         return True
 
     def scout(self, unit):
@@ -286,8 +290,6 @@ class Wedge(ai.AI):
           if b in self.bases:
             if not b.team == self.team:
               self.bases.remove(b)
-              #del self.perimeters[b]
-              #del self.perimeter_cyclers[b]
               self.targets.append(b)
           elif b in self.targets:
             if b.team == self.team:
@@ -324,7 +326,8 @@ class Wedge(ai.AI):
           if not self.attack(unit):
             if not self.capture(unit):
               if len(self.targets) > 0:
-                self.capture_target(unit, self.targets[0])
+                if not self.capture_target(unit, self.targets[0]):
+                  self.wander(unit)
               elif len(self.visible_enemies) > 0:
                 enemies = list(self.visible_enemies)
                 unit.move(enemies[0].position)
