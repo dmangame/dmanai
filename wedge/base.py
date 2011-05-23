@@ -47,13 +47,15 @@ class Wedge(ai.AI):
       self.prev_waypoint = 0
       self.waypoint_distance = 1
       self.tries = 0 # tries before moving to next waypoint
+      self.sight = 0
       
       # buildings
       self.targets = []
       self.bases = []
 
     def setup_waypoints(self, unit):
-      self.waypoint_distance = math.floor(unit.sight * 1.8)
+      self.sight = unit.sight
+      self.waypoint_distance = math.floor(self.sight * 1.8)
       distance = self.waypoint_distance
       compass = ["west","south","east","north"]
       compass_cycler = itertools.cycle(compass) 
