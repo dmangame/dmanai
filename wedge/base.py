@@ -74,12 +74,7 @@ class BuildingInfo(object):
       self.perimeter.append( (x, y) )
            
       self.perimeter_cycler = itertools.cycle(self.perimeter)
-      
-class UnitInfo(object):
-    def __init__(self, ai, unit):
-      self.ai = ai
-      self.unit = unit
-      
+            
 class MapSearch(object):
     def __init__(self, size):
       self.mapsize = size   # size of map
@@ -87,10 +82,16 @@ class MapSearch(object):
       self.sight = 20       # how far can our units see?
       
     def setup(self):
-      for y in range(0, self.mapsize, self.sight):
-        for x in range(0, self.mapsize, self.sight):
+      self.width = 0
+      self.height = 0
+      start = int(self.sight / 2)
+      for y in range(start, self.mapsize, self.sight):
+        self.height += 1
+        self.width = 0
+        for x in range(start, self.mapsize, self.sight):
           self.points.append( (x,y) )
-    
+          self.width += 1
+
     # returns nearest point on map to unit
     def nearest(self, position):
       closest = self.mapsize
@@ -111,6 +112,132 @@ class MapSearch(object):
               self.points.remove(p)
               break
 
+class Pather(object):
+    def __init__(self, ai, unit):
+      self.ai = ai
+      self.unit = unit
+      self.path = None      
+      self.node = 0
+      
+    def setup(self, position, length = 75, node = 0):
+      self.path = self.create_path(length, position)
+      self.node = node
+      
+    def update(self):
+      if self.path == None:
+        return
+        
+      if self.unit == None:
+        return
+        
+      if self.unit.is_alive:
+        if not self.ai.capture(self.unit):
+          if self.unit.calcDistance(self.path[self.node]) < 2:
+            self.node += 1
+            if self.node >= len(self.path):
+              self.node = 0
+            
+          self.unit.move( self.path[self.node] )
+      else:
+        pass
+        
+    # create a path of points length long, will generate with points starting closest to position
+    def create_path(self, length, position):
+      # figure out the order we want to travel... could be up -> left -> down -> right or up -> right -> down -> left or down -> left ... etc
+      # we lean towards exploring the center of the board first
+      down = True
+      if position[1] > self.ai.mapsize / 2:
+        down = False # if we are on the bottom half, go up instead
+        
+      right = True
+      if position[0] > self.ai.mapsize / 2:
+        right = False # if we are on the right side, go left instead
+      
+      if down and right:
+        compass = ["down", "right", "up", "left"]
+      elif down and not right:
+        compass = ["down", "left", "up", "right"]
+      elif not down and right:
+        compass = ["up", "right", "down", "left"]
+      else:
+        compass = ["up", "left", "down", "right"]      
+      
+      waypoints = []
+      waypoints.append(position)
+      x = position[0]
+      y = position[1]
+      
+      direction = 0             # direction to start in
+      steps_in_direction = 0    # steps taken in current direction
+      steps_to_take = 1         # steps to take before changing direction
+      steps_prev_taken = 0      # stores number of steps actually taken on previous leg
+      turns = 0                 # number of turns taken
+      tries = 0                 # number of tries at isValidSquare
+      
+      while len(waypoints) < length:        
+        mx, my = x,y
+        if compass[direction] == "down":
+          y += self.unit.sight
+        elif compass[direction] == "up":
+          y -= self.unit.sight
+        elif compass[direction] == "left":
+          x -= self.unit.sight
+        elif compass[direction] == "right":
+          x += self.unit.sight
+        else:
+          return
+          
+        if isValidSquare( (x, y), self.ai.mapsize ):
+          waypoints.append( (x, y) )
+          
+          steps_in_direction += 1
+          
+          if steps_in_direction >= steps_to_take:
+            turns += 1
+            steps_in_direction = 0
+            direction += 1
+            
+            if direction >= len(compass):
+              direction = 0
+              
+            if (direction == 0 or direction == 2) and turns >= 2:
+              steps_to_take += 1
+              
+        else:
+          x, y = mx, my
+          
+          # hit a wall, we need to turn outward and reverse the compass
+          direction -= 1
+          if direction < 0:
+            direction = 3
+            
+          compass = self.swap_compass(compass, direction)
+          steps_in_direction = steps_to_take # the next valid square will cause a natural turn
+          
+          tries += 1
+          if tries > 4:
+            return waypoints        
+          
+      return waypoints
+      
+    def swap_compass(self, compass, direction):
+      if direction == 1 or direction == 3:
+        if compass[0] == "up":
+          compass[0] = "down"
+          compass[2] = "up"
+        else:
+          compass[0] = "up"
+          compass[2] = "down"
+      else:
+        if compass[1] == "left":
+          compass[1] = "right"
+          compass[3] = "left"
+        else:
+          compass[1] = "left"
+          compass[3] = "right"
+        
+      return compass    
+
 class Wedge(ai.AI):
     def _init(self):
       self.perimeter_distance = 6
@@ -120,6 +247,9 @@ class Wedge(ai.AI):
       self.wander_radius = 25
 
       # scouting
+      self.scout = None
+      
+      # map info
       self.map = MapSearch(self.mapsize)
       self.map.setup()
       
@@ -174,14 +304,6 @@ class Wedge(ai.AI):
         unit.shoot(unit.in_range_enemies[0].position)
         return True
     
-    def scout(self, unit):
-      if not self.capture(unit):
-        waypoint = self.map.nearest( unit.position )
-        if waypoint == None:
-          self.wander( unit )
-        else:
-          unit.move( waypoint )
-    
     def _unit_spawned(self, unit):
       self.drones.append(unit)
       
@@ -194,14 +316,34 @@ class Wedge(ai.AI):
         if unit == value.defender:
           value.defener = None
           
-    def _spin(self):      
-      # draw our waypoints, for debugging
-      self.clearHighlights()
-      for p in self.map.points:
-        self.highlightLine( (p[0],p[1]), (p[0]+1, p[1]+1) )
-        
+    def _spin(self):   
+      targets = list(self.visible_enemies)
+                     
       # update our map
       self.map.update(self.my_units)      
+      
+      if self.scout == None:
+        if len(self.drones) > 0:
+          self.scout = Pather(self, self.drones[0])
+          self.drones.remove(0)
+      else:
+        if self.scout.path == None:
+          if self.my_buildings:
+            self.scout.setup(self.my_buildings[0].position)
+        else:
+          if not self.scout.unit.is_alive:
+            if len(self.drones) > 0:
+              self.scout = Pather(self, self.drones[0])
+              self.drones.remove(0)
+            
+          self.scout.update()
+        
+          # draw our waypoints, for debugging
+          self.clearHighlights()
+          last_point = self.scout.path[0]
+          for p in self.scout.path:
+            self.highlightLine( last_point, p )
+            last_point = p        
 
       # Check for perimeter distance increase
       if self.current_turn % 250 == 0:
@@ -218,8 +360,6 @@ class Wedge(ai.AI):
       for key, value in self.buildings.iteritems():
         if len(value.perimeter) == 0:
           value.establish_perimeter(self.perimeter_distance)
-          
-        print len(value.perimeter)
         
         # update perimeter if the distance has changed
         if self.perimeter_distance != value.perimeter_distance:
@@ -237,7 +377,7 @@ class Wedge(ai.AI):
             for drone in self.drones:
               distance = drone.calcDistance(value.building.position)
               
-              if distance < closest:
+              if distance < closest and drone != self.scout.unit:
                 closest = distance
                 drone_assigned = drone
             
@@ -258,12 +398,29 @@ class Wedge(ai.AI):
               if not self.capture(defender):
                 if not defender.is_moving:
                   defender.move( value.perimeter_cycler.next() )
+        
+        # else building not on our team
+        else:
+          targets.append(key)
     
       # Loop through our drones
       for unit in self.drones:
+        if unit == self.scout.unit:
+          continue
         if not self.attack(unit):
           if not self.capture(unit):
-            if self.visible_enemies:
-              unit.move( self.visible_enemies[0].position )
-            else:
+            if len(targets) == 0:
               self.wander(unit)
+            else:
+              # find closest target & move towards
+              closest = self.mapsize * 2
+              target = None
+              
+              for t in targets:
+                distance = unit.calcDistance(t.position)
+                
+                if distance < closest:
+                  closest = distance
+                  target = t
+              
+              unit.move(target.position)
