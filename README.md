@@ -2,10 +2,9 @@
 
 ## what
 
-dmanai is the main repository for ai contestants in [dmangame][1]
-This is the main repo for contestants in dmangame
-. If you'd like for other players to be
-able to play against your AI, fork this repository and add your AI to it.
+dmanai is the main repository for ai contestants in [dmangame][1] If you'd like
+for other players to be able to play against your AI, fork this repository and
+add your AI to it.
 
 [1]:http://github.com/okayzed/dmangame
 
