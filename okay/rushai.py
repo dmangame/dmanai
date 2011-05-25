@@ -12,6 +12,7 @@ AIClass = "RushAI"
 EXPLORER_RATIO=4
 
 class RushAI(okay.OkayAI):
+    PLAY_IN_LADDER=True
     def _init(self):
       self.capturers = {}
       self.defenders = {}

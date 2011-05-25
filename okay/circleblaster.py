@@ -15,6 +15,7 @@ import okay
 THIRTY_DEGREES=(180 / math.pi) * 31
 
 class CircleBlaster(okay.OkayAI):
+    PLAY_IN_LADDER=True
     def _init(self):
       self.cluster_size = 5
       self.expansion_phase = 0
