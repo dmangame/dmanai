@@ -136,7 +136,7 @@ class Wedge(ai.AI):
       
       # Check for perimeter distance increase
       if self.current_turn % 250 == 0:
-        self.perimeter_distance += 2  
+        self.perimeter_distance += 1  
         
       # Add new buildings we discover
       for building in self.visible_buildings:
