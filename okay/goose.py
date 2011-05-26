@@ -13,6 +13,7 @@ import okay
 
 
 class GooseAI(okay.OkayAI):
+  PLAY_IN_LADDER=True
   def _init(self):
     self.areas = 8
     self.squads = []
