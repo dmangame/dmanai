@@ -20,7 +20,7 @@ class Wedge(ai.AI):
       # config
       self.perimeter_distance = 3
       self.wander_radius = 25      
-      self.search_until = 200     # number of turns to search without fighting and without assisting other drones      
+      self.search_until = 100     # number of turns to search without fighting and without assisting other drones      
 
       # status
       self.setup_complete = False  # set to True when we get our first unit, we need info on sight etc from units
@@ -152,7 +152,7 @@ class Wedge(ai.AI):
           value.establish_perimeter(self.perimeter_distance)
         
         # update perimeter if the distance has changed
-        if self.perimeter_distance != value.perimeter_distance:
+        elif self.perimeter_distance != value.perimeter_distance:
           value.establish_perimeter(self.perimeter_distance)
 
         # our buildings require specific actions
@@ -160,17 +160,8 @@ class Wedge(ai.AI):
         
           # if the building has no defender, request one (preferably closest available unit)
           if value.defender == None:
-            closest = self.mapsize
-            drone_assigned = None
-            
-            # loop through drones, find closest one
-            for drone in self.drones:
-              distance = drone.calcDistance(value.building.position)
-              
-              if distance < closest:
-                closest = distance
-                drone_assigned = drone
-            
+            drone_assigned = closest_thing( value.building.position, self.drones )
+                       
             # assign drone to defend & remove from drone pool
             if drone_assigned != None:
               value.defender = drone_assigned
@@ -184,8 +175,8 @@ class Wedge(ai.AI):
           # Defender patrols the base perimeter
           defender = value.defender
           if defender != None:
-            if not self.attack(defender):
-              if not self.capture(defender):
+            if not self.capture(defender):
+              if not self.attack(defender):
                 if not defender.is_moving:
                   try:
                     defender.move( value.perimeter_cycler.next() )
