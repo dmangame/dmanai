@@ -13,12 +13,11 @@ add your AI to it.
 To run an AI from another user's repository, supply an AI string in the
 following format:
 
-    github_user:path_to_dep1.py,path_to_dep2.py,path_to_ai_module.py
+    github_user:path_to_ai_module.py
 
-for example: `python main.py okayzed:okay/okay.py,okay/goose.py
-ai/killncapture.py` will download dmanai/okay/okay.py and dmanai/okay/goose.py
-from github.com/okayzed/dmanai.git and instantiate an AI instance from the AI
-in goose.py to run against the local file ai/killncapture.py.
+for example: `python main.py okayzed:okay/goose.py` will download
+dmanai/okay/goose.py and its dependencies from github.com/okayzed/dmanai.git
+and play GooseAI against the local file ai/killncapture.py.
 
 *Remember* to look at AIs before you run them, as you are running remote code
 and it can potentially be dangerous.
@@ -27,6 +26,16 @@ If you'd like to maintain your machine's security, you may run games on an app
 engine instance. By default, using the app engine flag will run them on
 http://dmangame-app.appspot.com. Anyone can use this app engine instance and it's
 encouraged. See the dmangame repository for more information on using app engine.
+
+## module loading
+
+If you want your AI to be usable by others via the remote AI schema and you
+have multiple files, you'll have to make sure any module dependencies you
+import are imported via the 'require\_dependency' function in your main AI
+class. It knows whether your AI is being loaded from github or filesystem and
+imports the module from the same place.
+
+See dmanai/remote\_dep.py for an example AI with dependencies.
 
 ## registering an AI to play in ladder matches.
 
