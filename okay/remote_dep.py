@@ -9,7 +9,7 @@ import os
 
 # This loads the module 'okay' from filesystem or github, depending on how
 # this module is loaded.
-require_dependency('okay')
+require_dependency(module_name="okay", rel_path="../okay")
 
 AIClass = "RemoteDepAI"
 EXPLORER_RATIO=4
