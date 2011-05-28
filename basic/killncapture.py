@@ -5,6 +5,7 @@ import itertools
 AIClass = "KillNCapture"
 
 class KillNCapture(ai.AI):
+    PLAY_IN_LADDER=True
     def __init__(self, *args, **kwargs):
         ai.AI.__init__(self, *args, **kwargs)
 

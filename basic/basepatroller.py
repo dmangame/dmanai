@@ -6,6 +6,7 @@ from collections import defaultdict
 AIClass = "BasePatrollerAI"
 
 class BasePatrollerAI(ai.AI):
+    PLAY_IN_LADDER=True
     def __init__(self, *args, **kwargs):
         ai.AI.__init__(self, *args, **kwargs)
 
