@@ -11,7 +11,7 @@ import os
 # this module is loaded.
 require_dependency('okay')
 
-AIClass = "RushAI"
+AIClass = "RemoteDepAI"
 EXPLORER_RATIO=4
 
 # It kind of just sits there.
