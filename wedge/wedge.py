@@ -1,21 +1,25 @@
 import random
 import ai
 import math
+import itertools
 from collections import defaultdict
 from heapq import merge
-import itertools
 from world import isValidSquare
 
 AIClass="Wedge"
 
 import sys
 import os
-sys.path.append(os.path.dirname(__file__))
-import buildinginfo
-import mapsearch
+
+require_dependency(module_name = "buildinginfo")
+require_dependency(module_name = "mapsearch")
+require_dependency(module_name = "wedgeutil")
+
 from wedgeutil import closest_thing
 
 class Wedge(ai.AI):
+    PLAY_IN_LADDER = True
+    
     def _init(self):
       # config
       self.perimeter_distance = 3

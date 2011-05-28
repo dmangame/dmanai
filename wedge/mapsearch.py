@@ -44,8 +44,9 @@ class MapSearch(object):
         distances[p] = calc_distance( p, position )
 
         # if the point we just checked is within the units sight range, return this point immediately
-        if distances[p] < self.sight:
-          return p
+        # this makes for a speedier algorithm also less exact
+        #if distances[p] < self.sight:
+        #  return p
 
       sorted_d = sorted( distances.items(), key = lambda x: x[1] )
 

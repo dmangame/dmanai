@@ -22,6 +22,8 @@ class Base(object):
       return self.building
 
 class WedgeClassic(ai.AI):
+    PLAY_IN_LADDER = True
+    
     def _init(self):
       log.info("Initializing: Current Turn: %s", self.current_turn)
       self.preferred_defenders = 1
