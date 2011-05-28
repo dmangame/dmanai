@@ -10,10 +10,10 @@ AIClass="Wedge"
 
 import sys
 import os
-
+require_dependency(module_name = "wedgeutil")
 require_dependency(module_name = "buildinginfo")
 require_dependency(module_name = "mapsearch")
-require_dependency(module_name = "wedgeutil")
+
 
 from wedgeutil import closest_thing
 
