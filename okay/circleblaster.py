@@ -9,8 +9,8 @@ from collections import defaultdict
 from world import isValidSquare
 import sys
 import os
-sys.path.append(os.path.dirname(__file__))
-import okay
+
+require_dependency(module_name="okay")
 
 THIRTY_DEGREES=(180 / math.pi) * 31
 

@@ -5,8 +5,8 @@ from operator import attrgetter
 from collections import defaultdict
 import sys
 import os
-sys.path.append(os.path.dirname(__file__))
-import okay
+
+require_dependency(module_name="okay")
 
 AIClass = "RushAI"
 EXPLORER_RATIO=4
