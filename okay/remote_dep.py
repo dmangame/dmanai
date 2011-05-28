@@ -1,4 +1,5 @@
-# Test that remote dependency / local dependency loading is working.
+# Test that remote dependency / local dependency loading is
+# working.
 import ai
 import random
 import itertools
@@ -7,8 +8,11 @@ from collections import defaultdict
 import sys
 import os
 
-# This loads the module 'okay' from filesystem or github, depending on how
-# this module is loaded.
+# This loads the module 'okay' from filesystem or github,
+# depending on how this module is loaded.
+
+# NOTE: The rel_path argument is only required if the
+# dependency is not in the current directory as this AI.
 require_dependency(module_name="okay", rel_path="../okay")
 
 AIClass = "RemoteDepAI"
