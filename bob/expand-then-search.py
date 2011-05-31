@@ -66,7 +66,7 @@ def distance(a,b):
   return (a[0]-b[0])**2+(a[1]-b[1])**2
 
 class ExpandThenSearch(ai.AI):
-
+    PLAY_IN_LADDER=True
     area_size = 15
     def expanding_init(self):
       self.locations      = [(x*self.area_size,y*self.area_size) for x in xrange((self.mapsize+20)/self.area_size) for y in xrange((self.mapsize+20)/self.area_size)]
