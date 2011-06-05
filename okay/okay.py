@@ -1,12 +1,15 @@
 import ai
-import unit
 import ai_exceptions
 from collections import defaultdict
 
 import random
 import math
 
-from world import isValidSquare
+
+def isValidSquare(square, N):
+    x, y = square
+    return x < N and x >= 0 and y < N and y >= 0
+
 
 class NearbySearcher():
 

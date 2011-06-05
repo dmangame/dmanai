@@ -3,9 +3,8 @@ import random
 import itertools
 from operator import attrgetter
 from collections import defaultdict
-import sys
-import os
 
+print require_dependency
 require_dependency(module_name="okay")
 
 AIClass = "RushAI"

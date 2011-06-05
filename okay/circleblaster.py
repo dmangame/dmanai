@@ -6,9 +6,6 @@ import ai
 AIClass="CircleBlaster"
 import random
 from collections import defaultdict
-from world import isValidSquare
-import sys
-import os
 
 require_dependency(module_name="okay")
 
