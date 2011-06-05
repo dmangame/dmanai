@@ -136,7 +136,7 @@ class RushAI(okay.OkayAI):
             if len(self.explorers) < 2 and u in self.explorers:
               continue
 
-            if not u in defending:
+            if not u in defending and not u.is_capturing:
               unit_distances.append((u.calcDistance(pos), u))
 
           unit_distances.sort()
