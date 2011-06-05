@@ -3,9 +3,9 @@ import random
 import ai_exceptions
 import logging
 from collections import defaultdict
-log = logging.getLogger(AIClass)
 
 AIClass="GooseAI"
+log = logging.getLogger(AIClass)
 
 require_dependency(module_name="okay")
 
