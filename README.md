@@ -22,10 +22,13 @@ and play GooseAI against the local file ai/killncapture.py.
 *Remember* to look at AIs before you run them, as you are running remote code
 and it can potentially be dangerous.
 
-If you'd like to maintain your machine's security, you may run games on an app
-engine instance. By default, using the app engine flag will run them on
-http://dmangame-app.appspot.com. Anyone can use this app engine instance and it's
-encouraged. See the dmangame repository for more information on using app engine.
+The -s or --safe-mode flag will use tav's safelite.py module and attempt to
+disable most of the ways the executing code can touch your filesystem. If
+that's not enough and you'd like to maintain your machine's security, you may
+run games on an app engine instance. By default, using the app engine flag will
+run them on http://dmangame-app.appspot.com. Anyone can use this app engine
+instance and it's encouraged. See the dmangame repository for more information
+on using app engine.
 
 ## module loading
 
