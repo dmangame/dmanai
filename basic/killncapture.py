@@ -16,7 +16,7 @@ class KillNCapture(ai.AI):
                        (0, self.mapsize),
                        (self.mapsize, self.mapsize) ]
         self.torandom = defaultdict(bool)
-        self.unit_corners = {}
+        self.unit_corners = defaultdict(lambda: next(self.corner_cycler))
         self.corner_cycler = itertools.cycle(self.corners)
         self.squares = {}
 
@@ -70,7 +70,3 @@ class KillNCapture(ai.AI):
     def _spin(self):
         for unit in self.my_units:
             self.patrol(unit)
-
-    def _unit_spawned(self, unit):
-        self.unit_corners[unit] = next(self.corner_cycler)
-
