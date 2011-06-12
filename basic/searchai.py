@@ -41,7 +41,7 @@ class SearchAI(ai.AI):
         self.highlightRegion(area)
 
     def _unit_died(self, dead_unit):
-      del self.under_exploration[self.destinations[unit]]
+      del self.under_exploration[self.destinations[dead_unit]]
 
     def build_grid(self):
       for x in xrange((self.mapsize / GRID_RESOLUTION) + 1):
