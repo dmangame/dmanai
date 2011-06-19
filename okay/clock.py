@@ -11,9 +11,17 @@ class ClockAI(ai.AI):
   PLAY_IN_LADDER=True
   def _init(self):
     self.clock = okay.LineSquad(mapsize=self.mapsize)
+    self.spawn_point = None
 
   def _spin(self):
-    self.clock.destination = self.my_buildings[0].position
+    if not self.spawn_point:
+      self.spawn_point = self.my_buildings[0]
+
+    if not self.my_buildings:
+      self.clock.destination = self.spawn_point
+    else:
+      self.clock.destination = self.my_buildings[0].position
+
     self.clock.radian_offset += 0.05
     self.clock.spin()
 
