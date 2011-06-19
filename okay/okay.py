@@ -103,6 +103,7 @@ class OkayAI(ai.AI):
     self.buildings = {}
     self.searcher = NearbySearcher(self.mapsize)
     self.explorers = {}
+    self.mapsize = settings.map.size
 
     # Histogram of where our explorers die
     self.explorer_death_positions = defaultdict(int)
@@ -341,6 +342,28 @@ class V(Squad):
   def position_offsets(self):
     return [(-5,-5), (0,0), (-5,5)]
 
+
+class LineSquad(Squad):
+  def __init__(self, *args, **kwargs):
+    Squad.__init__(self, *args, **kwargs)
+    self.positions = []
+    self.radian_offset = 0
+
+  def getPositionOffsets(self):
+    spacing = settings.unit.sight
+    x = 0
+    y = 0
+    position_offsets = []
+    dist = 1
+    for i in xrange(len(self.positions)):
+      pos_x = x+(dist*math.cos(self.radian_offset))
+      pos_y = y+(dist*math.sin(self.radian_offset))
+      position_offsets.append((int(pos_x), int(pos_y)))
+      dist += spacing
+
+    return position_offsets
+
+  position_offsets = property(getPositionOffsets)
 
 THIRTY_DEGREES=(180 / math.pi) * 30
 class CircleSquad(Squad):
