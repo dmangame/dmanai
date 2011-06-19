@@ -18,7 +18,7 @@ class ClockAI(ai.AI):
       self.spawn_point = self.my_buildings[0]
 
     if not self.my_buildings:
-      self.clock.destination = self.spawn_point
+      self.clock.destination = self.spawn_point.position
     else:
       self.clock.destination = self.my_buildings[0].position
 
