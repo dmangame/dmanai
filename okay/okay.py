@@ -212,6 +212,13 @@ class Squad(object):
         pos = self.destination or self.base
         off = self.position_offsets[i]
         d_x, d_y = (pos[0] + off[0], pos[1]+off[1])
+
+        # Propel forward a little faster if we are hitting
+        # the map edge.
+        if d_x < 0 or d_x > self.mapsize \
+          or d_y < 0 or d_y > self.mapsize:
+          self.radian_offset += 0.005
+
         d_x = max(min(self.mapsize, d_x), 0)
         d_y = max(min(self.mapsize, d_y), 0)
 
@@ -354,10 +361,11 @@ class LineSquad(Squad):
     x = 0
     y = 0
     position_offsets = []
-    dist = 1
+    dist = spacing
     for i in xrange(len(self.positions)):
       pos_x = x+(dist*math.cos(self.radian_offset))
       pos_y = y+(dist*math.sin(self.radian_offset))
+
       position_offsets.append((int(pos_x), int(pos_y)))
       dist += spacing
 
