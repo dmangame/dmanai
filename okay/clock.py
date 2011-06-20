@@ -1,32 +1,42 @@
 import ai
 import random
 import itertools
+import math
 from operator import attrgetter
 from collections import defaultdict
 
 require_dependency(module_name="okay")
 AIClass = "ClockAI"
 
+RADIAN_FACTOR=0.0174532925
 class ClockAI(ai.AI):
   PLAY_IN_LADDER=True
   def _init(self):
-    self.clock = okay.LineSquad(mapsize=self.mapsize)
+    self.buildings = {}
+    self.building_map = {}
+    self.clocks = defaultdict(lambda: okay.LineSquad(mapsize=self.mapsize))
     self.spawn_point = None
 
   def _spin(self):
-    if not self.spawn_point:
-      self.spawn_point = self.my_buildings[0]
+    for b in self.visible_buildings:
+      if not b in self.buildings:
+        self.buildings[b] = b.position
+        self.building_map[b.position] = b
 
-    if not self.my_buildings:
-      self.clock.destination = self.spawn_point.position
-    else:
-      self.clock.destination = self.my_buildings[0].position
-
-    self.clock.radian_offset += 0.05
-    self.clock.spin()
+    for position, clock in self.clocks.iteritems():
+      clock.destination = position
+      size = float(len(clock)*settings.unit.sight)
+      theta = math.acos(
+        (size**2 + size**2 - settings.unit.speed) \
+        / (2*size*size))
+      clock.radian_offset += theta
+      clock.spin()
 
   def _unit_spawned(self, unit):
-    self.clock.add_unit(unit)
+    self.clocks[unit.position].add_unit(unit)
 
   def _unit_died(self, unit):
-    self.clock.remove_unit(unit)
+    for clock in self.clocks.values():
+      clock.remove_unit(unit)
+      clock.reform()
+

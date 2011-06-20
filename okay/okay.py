@@ -203,6 +203,12 @@ class Squad(object):
     except:
       return 0
 
+  def reform(self):
+    for pos in self.positions:
+      unit = getattr(self, pos)
+      self.remove_unit(unit)
+      self.add_unit(unit)
+
   def units_in_place(self):
     for i in xrange(len(self.positions)):
       p = self.positions[i]
