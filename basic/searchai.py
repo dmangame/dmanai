@@ -79,17 +79,11 @@ class StarterAI(ai.AI):
         self.explorers[unit] = None
 
     def _unit_died(self, dead_unit):
-      if dead_unit in self.attackers:
-        del self.attackers[dead_unit]
+      allocations = [self.attackers, self.defenders, self.explorers, self.destinations]
 
-      if dead_unit in self.defenders:
-        del self.defenders[dead_unit]
-
-      if dead_unit in self.explorers:
-        del self.explorers[dead_unit]
-
-      if dead_unit in self.destinations:
-        del self.destinations[dead_unit]
+      for assignment in allocations:
+        if dead_unit in assignment:
+          del assignment[dead_unit]
 
       try:
         del self.under_exploration[self.destinations[dead_unit]]
