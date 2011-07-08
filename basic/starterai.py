@@ -14,7 +14,7 @@ def to_area((x,y)):
           y / GRID_RESOLUTION * GRID_RESOLUTION)
 
 
-class BaseStrategy(object):
+class BaseStrategy(object):#{{{
   def __init__(self, ai):
     self.units = {}
     self.ai = ai
@@ -32,8 +32,8 @@ class BaseStrategy(object):
       del self.units[dead_unit]
     except:
       pass
-
-class DefendStrategy(BaseStrategy):
+#}}}
+class DefendStrategy(BaseStrategy):#{{{
   def __init__(self, ai):
     self.defenders = self.units = {}
     self.ai = ai
@@ -49,13 +49,12 @@ class DefendStrategy(BaseStrategy):
         if not b.position in defended:
           self.defenders[unit] = b.position
           return True
-
-class AttackStrategy(BaseStrategy):
+#}}}
+class AttackStrategy(BaseStrategy):#{{{
   # No attack strategy, at the moment.
   pass
-
-# {{{ Exploration code
-class ExploreStrategy(BaseStrategy):
+#}}}
+class ExploreStrategy(BaseStrategy):#{{{
   def __init__(self, ai):
     # Exploration Data
     self.explorers = self.units = {}
@@ -117,10 +116,9 @@ class ExploreStrategy(BaseStrategy):
       self.destinations[unit] = self.next_destination(unit)
 
     self.ai.highlightLine(unit.position, self.destinations[unit])
-    unit.move(self.destinations[unit])
-# }}}
+    unit.move(self.destinations[unit])#}}}
 
-class StarterAI(ai.AI):
+class StarterAI(ai.AI):#{{{
 
     # {{{ Initializer
     def _init(self):
@@ -169,4 +167,4 @@ class StarterAI(ai.AI):
     # }}}
 
 
-
+#}}}
