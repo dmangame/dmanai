@@ -5,7 +5,7 @@ from operator import attrgetter
 from collections import defaultdict
 import logging
 
-AIClass = "StarterAI"
+AIClass = "SearchAI"
 log = logging.getLogger(AIClass)
 
 GRID_RESOLUTION=32
@@ -13,7 +13,7 @@ def to_area((x,y)):
   return (x / GRID_RESOLUTION * GRID_RESOLUTION,
           y / GRID_RESOLUTION * GRID_RESOLUTION)
 
-class StarterAI(ai.AI):
+class SearchAI(ai.AI):
 
     # {{{ Initializer
     def _init(self):
