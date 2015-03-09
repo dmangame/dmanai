@@ -9,7 +9,6 @@ from mapobject import Building
 AIClass="XS"
 
 class X(object):
-    PLAY_IN_LADDER=True
     def __init__(self, ai, units=None, spread=1):
         self.ai = ai
         self.units = units or []
@@ -73,6 +72,7 @@ class X(object):
         self.units[0].capture(building)
 
 class XS(ai.AI):
+    PLAY_IN_LADDER=True
     def _init(self):
         self.xs = []
         self.buildings = set()
