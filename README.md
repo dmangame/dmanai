@@ -50,3 +50,4 @@ See dmanai/remote\_dep.py for an example AI with dependencies.
     username:path_to_ai.py.` (e.g. `python main.py -r basic/killncapture.py` - if
     you run this, you'll get a message explaining how to register an AI
     properly)
+
