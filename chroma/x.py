@@ -7,6 +7,7 @@ import ai
 from mapobject import Building
 
 AIClass="XS"
+PLAY_IN_LADDER=True
 
 class X(object):
     def __init__(self, ai, units=None, spread=1):
