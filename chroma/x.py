@@ -9,7 +9,7 @@ from mapobject import Building
 AIClass="XS"
 
 class X(object):
-    def __init__(self, ai, units=None, spread=1):
+    def __init__(self, ai, units=None, spread=5):
         self.ai = ai
         self.units = units or []
         self.spread = spread
