@@ -7,9 +7,10 @@ import ai
 from mapobject import Building
 
 AIClass="XS"
+SPREAD=10
 
 class X(object):
-    def __init__(self, ai, units=None, spread=5):
+    def __init__(self, ai, units=None, spread=SPREAD):
         self.ai = ai
         self.units = units or []
         self.spread = spread
@@ -101,6 +102,15 @@ class XS(ai.AI):
             self.buildings,
             key = lambda b: 1 if b.team == self.team else 2)
 
+        def fudge(pos):
+          fudgeX = random.randint(SPREAD / 2, SPREAD)
+          fudgeY = random.randint(SPREAD / 2, SPREAD)
+          if random.random() > 0.5:
+            fudgeX *= -1
+          if random.random() > 0.5:
+            fudgeY *= -1
+          return (pos[0] + fudgeX, pos[1] + fudgeY)
+
         for i, x in enumerate(self.xs):
             t = hostile = None
             if i < len(targets):
@@ -108,7 +118,7 @@ class XS(ai.AI):
                 hostile = t.team != self.team
 
             if x.count <= self.minimum:
-                x.move(targets[0].position)
+                x.move(fudge(targets[0].position))
                 x.attack()
                 continue
 
@@ -123,7 +133,7 @@ class XS(ai.AI):
                     continue
 
             if not x.is_moving:
-                x.move(self.target())
+                x.move(fudge(self.target()))
                 x.attack()
 
     def _unit_spawned(self, unit):
